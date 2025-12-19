@@ -2,6 +2,7 @@ fn main(): int {
 
     // TODO: Make hello world script later :p
     // but i wont do strings so IDK
+    // TODO: Parse strings in lexer
     print("Hello World!");
     return 0;
 }

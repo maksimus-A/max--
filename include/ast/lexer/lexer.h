@@ -43,6 +43,10 @@ enum TokenKind {
     DIV,
     EQ,
     NEQ,
+    LESS_THAN,
+
+    // --- Error token ---
+    NO_TOKEN,
 
     // ---- Token count (for debug) ----
     TOK_COUNT

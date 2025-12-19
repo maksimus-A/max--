@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
 #include "common.h"
 #include "ast/lexer/lexer.h"
 
@@ -20,6 +21,37 @@ static inline int is_comment_starter(char c) {
     return c == '/';
 }
 
+static enum TokenKind get_keyword(char* buf, int i, int length) {
+    enum TokenKind token_kind = IDENTIFIER;
+    char *p = buf + i;
+    switch (length) {
+        case 2:
+            printf("p: %c\n", *p);
+            if (memcmp(p, "if", 2) == 0) token_kind = IF;
+            else if (memcmp(p, "fn", 2) == 0) token_kind = FN;
+            break;
+
+        case 3:
+            if (memcmp(p, "int", 3) == 0) token_kind = INT;
+            break;
+
+        case 4:
+            if (memcmp(p, "void", 4) == 0) token_kind = VOID;
+            break;
+        
+        case 5:
+            if (memcmp(p, "while", 5) == 0) token_kind = WHILE;
+            break;
+
+        case 6:
+            if (memcmp(p, "return", 6) == 0) token_kind = RETURN;
+            break;
+
+        default:
+            token_kind = IDENTIFIER;
+    }
+    return token_kind;
+}
 
 static int get_whitespace_len(char* buf, int i) {
     int start = i;
@@ -94,6 +126,8 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
     // if it is, store its line, col,
     // length, and start.
 
+    // TODO: actually use result or just refactor its use case
+
     Result result;
     result.error_code = 0;
     result.error_message = "";
@@ -104,13 +138,14 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
 
     while (i < source_file->length) {
         char c = source_file->buffer[i];
-        // TODO: SL comment skipper, keyword finder, func finder?
+        // TODO: keyword finder, func finder?
         // FOR NOW WE TRY TO SUPPORT:
         // tests/testfiles/simple/int_dec.in
         // tests/testfiles/strings/hello_world.in
         switch (c) {
             case '=':
                 {
+                    // TODO: Consider '==' as well.
                     Token token = set_token(EQ, i, line, col, 1);
                     push_token(tokens, token);
                 }
@@ -151,6 +186,12 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                     push_token(tokens, token);
                 }
                 break;
+            case '<':
+                {
+                    Token token = set_token(LESS_THAN, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
             case '\n':
                 {
                     line++;
@@ -168,7 +209,11 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                 }
                 else if (is_ident_starter((unsigned char)c)) {
                     int length = get_identifier_len(source_file->buffer, i);
-                    Token token = set_token(IDENTIFIER, i, line, col, length);
+                    Token token;
+                    enum TokenKind token_kind = get_keyword(source_file->buffer, i, length);
+                    // TODO: Validate identifier if token_kind is not a keyword
+                    // Currently doesn't validate if no invalid keywords exist.
+                    token = set_token(token_kind, i, line, col, length);
                     push_token(tokens, token);
                     i = i + length - 1;
                 }
