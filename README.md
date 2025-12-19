@@ -1,6 +1,6 @@
 # max--
 
-A compiler for my own language I invented. I haven't made a formal spec website or sheet yet, but I probably will at some point. It'll be kind of like C but a bit nicer (no pointers :) )
+A compiler for my own language I invented. I haven't made a formal spec website or sheet yet, but I probably will at some point. It'll be kind of like C but a bit nicer (no pointers :) ) Also, it will have heterogeneous containers (like lists in python), mutable by by default types, is statically typed, and... I'll think of more stuff.
 
 The point was to help me learn both how the bootstrapping process works, how to self-host (just for fun), and the fun of inventing my own language.
 
@@ -13,5 +13,8 @@ The language will only compile to x86. I could have used LLVM as my target but I
 - Run `./compile.sh`. It'll take care of everything for you :)
 
 If you'd rather configure some stuff:
-- *Insert instructions here*
+```
+cmake -S . -B build
+cmake --build build
+```
 
