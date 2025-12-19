@@ -96,6 +96,8 @@ int main(int argc, char **argv) {
 
     if (args.debug) {
         print_all_tokens(&tokens, source_file.buffer);
+        printf("\n");
+        pretty_print_tokens(&tokens, source_file.buffer);
     }
 
     

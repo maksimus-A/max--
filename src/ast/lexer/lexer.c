@@ -16,6 +16,10 @@ static inline int is_whitespace_char(char c) {
     return c == '\n' || c == ' ' || c == '\t';
 }
 
+static inline int is_comment_starter(char c) {
+    return c == '/';
+}
+
 
 static int get_whitespace_len(char* buf, int i) {
     int start = i;
@@ -129,12 +133,31 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                     push_token(tokens, token);
                 }
                 break;
+            case '{':
+                {
+                    Token token = set_token(CUR_BRACK_START, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
+            case '}':
+                {
+                    Token token = set_token(CUR_BRACK_END, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
+            case ':':
+                {
+                    Token token = set_token(COLON, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
             case '\n':
                 {
                     line++;
                     col = 0;
                 }
                 break;
+
 
             default:
                 if (isdigit((unsigned char)c)) {
@@ -152,6 +175,11 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                 else if (is_whitespace_char((unsigned char)c)){
                     // skip whitespace
                     int length = get_whitespace_len(source_file->buffer, i);
+                    i = i + length - 1;
+                }
+                else if (is_comment_starter((unsigned char)c )) {
+                    // skip single line comments
+                    int length = get_sl_comment_len(source_file->buffer, i);
                     i = i + length - 1;
                 }
 

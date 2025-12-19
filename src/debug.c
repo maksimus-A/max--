@@ -48,3 +48,12 @@ void print_all_tokens(TokenBuffer* tokens, const char *buffer) {
         );
     }
 }
+
+void pretty_print_tokens(TokenBuffer* tokens, const char *buffer) {
+    for (int i = 0; i < tokens->count; i++) {
+        Token token = tokens->data[i];
+        printf("%s ", token_kind_str[token.token_kind]);
+        fflush(stdout);
+    }
+    printf("\n");
+}
