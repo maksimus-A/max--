@@ -1,0 +1,6 @@
+fn main(): int {
+
+    // TODO: Make hello world script later :p
+    // but i wont do strings so IDK
+    return 0;
+}

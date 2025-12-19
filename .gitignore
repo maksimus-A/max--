@@ -1,0 +1,7 @@
+# Ignore build folders
+build/
+
+# Ignore binaries
+bin/
+
+.cache/
