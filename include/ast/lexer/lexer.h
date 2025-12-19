@@ -7,38 +7,52 @@
 // their place in the file being lexed.
 
 enum TokenKind {
+    // ---- Special tokens ----
+    TOK_EOF,
+
+    // ---- Keywords ----
     IF,
     WHILE,
-    PLUS,
-    MINUS,
-    MULT,
-    DIV,
     FN,
+    RETURN,
+    INT,
+    VOID,
+    VARIABLE,
+
+    // ---- Identifiers & literals ----
     IDENTIFIER,
+    INT_LITERAL,
+
+    // ---- Comments ----
     SL_COMMENT,
     ML_COMMENT,
-    RETURN,
-    INT_LITERAL,
+
+    // ---- Delimiters / punctuation ----
     CUR_BRACK_START,
     CUR_BRACK_END,
     PAREN_START,
     PAREN_END,
     SEMICOLON,
     COLON,
-    VARIABLE,
-    INT,
-    VOID,
     COMMA,
+
+    // ---- Operators ----
+    PLUS,
+    MINUS,
+    MULT,
+    DIV,
     EQ,
     NEQ,
-    TOK_EOF
+
+    // ---- Token count (for debug) ----
+    TOK_COUNT
 };
 
 typedef struct Token Token;
 struct Token {
     enum TokenKind token_kind;
     size_t length;
-    int starting_point;
+    int start;
     int line;
     int col;
 };
