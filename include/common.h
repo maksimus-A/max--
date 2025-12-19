@@ -1,8 +1,15 @@
 #pragma once
 #include <stdio.h>
+
+#define START_BUFFER_SIZE 16
+
+// TODO: Result should also return
+// a pointer to a struct I need? Right now
+// it's kinda useless, could just return int.
 struct Result {
     int error_code;
     const char* error_message;
+    void* data; // TODO:CHECK??
 };
 typedef struct Result Result;
 

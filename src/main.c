@@ -50,8 +50,10 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Cannot open %s: %s\n", argv[1], strerror(errno));
     }
     
-    // Read file into buffer
+    // Read file into buffer.
+    // Result just stores error code/messages
     Source source_file;
+    // TODO: Check result of filling buffer for errors
     Result buffer_result  = read_source_file(fp, &source_file);
     fclose(fp);
 
@@ -59,6 +61,15 @@ int main(int argc, char **argv) {
     //printf("%s", source_file.buffer);
     //printf("Buffer size: %zu", source_file.length);
 
+    // Lex the input buffer into tokens
+    // TODO: Check result of filling buffer for errors
+    int start_size = START_BUFFER_SIZE;
+    TokenBuffer tokens;
+    tokens.data = malloc(sizeof(char) * start_size);
+
+    Result tokenize_result = lex_input(&tokens, &source_file);
+    
+    free(tokens.data);
     free_source(&source_file);
     
     return 0;
