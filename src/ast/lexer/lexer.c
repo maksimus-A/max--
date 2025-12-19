@@ -5,6 +5,8 @@
 #include "common.h"
 #include "ast/lexer/lexer.h"
 
+// TODO: Consider putting helpers inside 'lexer_helper.c' or something
+
 static inline int is_ident_starter(char c) {
     return isalpha((unsigned char)c) || c == '_';
 }
@@ -17,8 +19,29 @@ static inline int is_whitespace_char(char c) {
     return c == '\n' || c == ' ' || c == '\t';
 }
 
-static inline int is_comment_starter(char c) {
-    return c == '/';
+static inline int is_comment_or_div_starter(char* buf, int i) {
+    // For both single/multi-line and division op
+    if (buf[i] == '/') {
+        return (buf[i+1] == '/' || buf[i+1] == '*' || is_whitespace_char(buf[i+1]));
+    }
+    return 0;
+}
+
+static inline int is_sl_comment(char* buf, int i) {
+    return buf[i+1] == '/';
+}
+
+static inline int is_ml_comment(char* buf, int i) {
+    if (buf[i] != '\0') {
+        return buf[i+1] == '*';
+    }
+    // TODO: Error handle; if we get here the the ML comment reached EOF.
+    // Need to refactor a lot for error handling. Sounds cringe.
+    return 0;
+}
+
+static inline int is_div_op(char* buf, int i) {
+    return is_whitespace_char(buf[i+1]);
 }
 
 static enum TokenKind get_keyword(char* buf, int i, int length) {
@@ -26,7 +49,6 @@ static enum TokenKind get_keyword(char* buf, int i, int length) {
     char *p = buf + i;
     switch (length) {
         case 2:
-            printf("p: %c\n", *p);
             if (memcmp(p, "if", 2) == 0) token_kind = IF;
             else if (memcmp(p, "fn", 2) == 0) token_kind = FN;
             break;
@@ -55,7 +77,7 @@ static enum TokenKind get_keyword(char* buf, int i, int length) {
 
 static int get_whitespace_len(char* buf, int i) {
     int start = i;
-    while (is_whitespace_char(buf[i]) & (buf[i] != '\0')) i++;
+    while (is_whitespace_char(buf[i]) && (buf[i] != '\0')) i++;
     return i - start;
 }
 
@@ -63,7 +85,18 @@ static int get_sl_comment_len(char* buf, int i) {
     // Assumes we know we're in a comment.
     // Moves index pointer to after the comment.
     int start = i;
-    while (buf[i] != '\n' & buf[i] != '\0') i++;
+    while (buf[i] != '\n' && buf[i] != '\0') i++;
+    return i - start;
+}
+
+static int get_ml_comment_len(char* buf, int i) {
+    // Assumes we know we're in a comment.
+    // Moves index pointer to after the comment.
+    int start = i;
+    while (buf[i] != '\0')  {
+        if (buf[i] == '*' && buf[i+1] == '/') return i+1-start;
+        i++;
+    }
     return i - start;
 }
 
@@ -111,7 +144,7 @@ void ensure_capacity(TokenBuffer* tokens) {
 }
 
 void push_token(TokenBuffer* tokens, Token token) {
-    // TODO: Handle error pushing tokens!
+    // TODO: Handle errors pushing tokens!
     ensure_capacity(tokens);
     tokens->data[tokens->count] = token;
     tokens->count++;
@@ -127,6 +160,7 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
     // length, and start.
 
     // TODO: actually use result or just refactor its use case
+    // TODO: Fix col bug, when it's a newline, col is incorrect (up by 1).
 
     Result result;
     result.error_code = 0;
@@ -143,6 +177,7 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
         // tests/testfiles/simple/int_dec.in
         // tests/testfiles/strings/hello_world.in
         switch (c) {
+            // Simple delimiters
             case '=':
                 {
                     // TODO: Consider '==' as well.
@@ -153,6 +188,12 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
             case ';':
                 {
                     Token token = set_token(SEMICOLON, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
+            case ',':
+                {
+                    Token token = set_token(COMMA, i, line, col, 1);
                     push_token(tokens, token);
                 }
                 break;
@@ -183,6 +224,26 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
             case ':':
                 {
                     Token token = set_token(COLON, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
+            // Operations
+             case '+':
+                {
+                    Token token = set_token(PLUS, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
+            case '-':
+                {
+                    Token token = set_token(MINUS, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
+            case '*':
+                {
+                    // TODO: Check for exponentiation
+                    Token token = set_token(MULT, i, line, col, 1);
                     push_token(tokens, token);
                 }
                 break;
@@ -222,12 +283,23 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                     int length = get_whitespace_len(source_file->buffer, i);
                     i = i + length - 1;
                 }
-                else if (is_comment_starter((unsigned char)c )) {
+                else if (is_comment_or_div_starter(source_file->buffer, i)) {
                     // skip single line comments
-                    int length = get_sl_comment_len(source_file->buffer, i);
-                    i = i + length - 1;
+                    // TODO: Skip multi-line here too later, shouldn't be hard.
+                    if (is_div_op(source_file->buffer, i)) {
+                        Token token = set_token(DIV, i, line, col, 1);
+                        push_token(tokens, token);
+                    }
+                    else if (is_sl_comment(source_file->buffer, i)) {
+                        int length = get_sl_comment_len(source_file->buffer, i);
+                        i = i + length - 1;
+                    }
+                    else if (is_ml_comment(source_file->buffer, i)) {
+                        int length = get_ml_comment_len(source_file->buffer, i);
+                        i = i + length - 1;
+                    }
+                    
                 }
-
                 break;
 
 

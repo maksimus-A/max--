@@ -8,7 +8,6 @@
 #include "debug.h"
 
 
-
 // Idea:
 // Parse input file given here
 // Turn file into AST
@@ -98,6 +97,7 @@ int main(int argc, char **argv) {
         print_all_tokens(&tokens, source_file.buffer);
         printf("\n");
         pretty_print_tokens(&tokens, source_file.buffer);
+        printf("---------------------");
     }
 
     
