@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdalign.h>
+#include <stddef.h>
 #include <assert.h>
 #include "arena/arena.h"
 
@@ -33,13 +34,14 @@ int fits_in_current_block(Arena* arena, size_t size, size_t aligned_used) {
     // TODO: add safety checks
     if (arena->curr_block == NULL) {return 0;}
     MemBlock* curr_mem = arena->curr_block;
-    assert(aligned_used <= curr_mem->capacity);
+    if (aligned_used > curr_mem->capacity) { return 0; }
     
     return size <= curr_mem->capacity - aligned_used;
 }
 
 MemBlock* create_block(size_t size) {
     // TODO: Check size does not overflow?
+    //if (size > SIZE_MAX - sizeof(MemBlock)) return NULL;
     size_t new_block_size = sizeof(MemBlock) + size;
     MemBlock* new_block = malloc(new_block_size);
     if (!new_block) {
@@ -90,6 +92,11 @@ void* current_ptr(Arena* arena, size_t aligned_used) {
 }
 
 void* arena_alloc(Arena* arena, size_t size, size_t align) {
+
+    if (arena->curr_block == NULL) {
+        arena_add_block(arena, size);
+    }
+
     size_t aligned_used = round_up(arena->curr_block->used, align);
     if (!fits_in_current_block(arena, size, aligned_used)) {
         int success = arena_add_block(arena, choose_block_size(size));
@@ -99,11 +106,49 @@ void* arena_alloc(Arena* arena, size_t size, size_t align) {
         }
         aligned_used = round_up(arena->curr_block->used, align);
     }
-    void* p = current_ptr(arena, aligned_used+size); // answers: where should I place the next block?
+    void* p = current_ptr(arena, aligned_used); // answers: where should I place the next block?
     bump(arena, aligned_used+size);
     return p;
 }
 
-void* arena_destroy(Arena* arena) {
-    // TODO: Implement arena destroying
+int arena_init(Arena* arena, size_t size) {
+    if (!arena_add_block(arena, choose_block_size(size))) {
+        fprintf(stderr, "Failed to initialize arena.");
+        return 1;
+    }
+    return 0;
+}
+
+int arena_destroy(Arena* arena) {
+    if (!arena || !arena->start_block) {
+        fprintf(stderr, "Failed to destroy arena: Arena has no start block.\n");
+        return 1;
+    }
+
+    MemBlock* block = arena->start_block;
+    while (block != NULL) {
+        MemBlock* next = block->next;
+        free(block);
+        block = next;
+    }
+
+    arena->start_block = NULL;
+    arena->curr_block = NULL;
+    return 0;
+}
+
+int arena_reset(Arena* arena) {
+    if (!arena->start_block) {
+        fprintf(stderr, "Failed to reset arena: Arena has no start block.");
+        return 1;
+    }
+
+    MemBlock* block = arena->start_block;
+    while (block->next != NULL) {
+        block->used = 0;
+        block = block->next;
+    }
+    block->used = 0;
+    arena->curr_block = arena->start_block;
+    return 0;
 }

@@ -1,5 +1,6 @@
 /* An arena/bump allocator is more efficient with memory and memory freeing.
 I'm doing it because I want to learn more about C, as well as for performance.*/
+#pragma once
 #include <stddef.h>
 typedef struct MemBlock MemBlock;
 struct MemBlock {
@@ -21,3 +22,11 @@ typedef struct Arena {
 } Arena;
 
 void* arena_alloc(Arena* arena, size_t size, size_t align);
+
+int arena_init(Arena* arena, size_t size);
+
+int arena_destroy(Arena* arena);
+
+int arena_reset(Arena* arena);
+
+
