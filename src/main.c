@@ -3,6 +3,7 @@
 #include <string.h>
 #include <errno.h>
 #include "ast/lexer/lexer.h"
+#include "ast/parser/parser.h"
 #include "common.h"
 
 #include "debug.h"
@@ -99,6 +100,10 @@ int main(int argc, char **argv) {
         pretty_print_tokens(&tokens, source_file.buffer);
         printf("---------------------");
     }
+
+    // Create AST based on token buffer
+    ASTNode ast;
+    Result ast_result = build_ast(&tokens, &ast);
 
     
     free(tokens.data);

@@ -17,7 +17,6 @@ enum TokenKind {
     RETURN,
     INT,
     VOID,
-    VARIABLE,
 
     // ---- Identifiers & literals ----
     IDENTIFIER,

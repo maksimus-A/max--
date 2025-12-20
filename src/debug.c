@@ -9,7 +9,6 @@ static const char* token_kind_str[TOK_COUNT+1] = {
     /* RETURN */           "RETURN",
     /* INT */              "INT",
     /* VOID */             "VOID",
-    /* VARIABLE */         "VARIABLE",
 
     /* IDENTIFIER */       "IDENTIFIER",
     /* INT_LITERAL */      "INT_LITERAL",
