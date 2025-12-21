@@ -1,9 +1,14 @@
+#if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
+#include "arena/arena_test.h"
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include "ast/lexer/lexer.h"
 #include "ast/parser/parser.h"
+#include "arena/arena.h"
 #include "common.h"
 
 #include "debug.h"
@@ -80,7 +85,6 @@ int main(int argc, char **argv) {
         printf("--------- LEXER ---------\n");
     }
     
-
     // Lex the input buffer into tokens
     // TODO: Check result of filling buffer for errors
     int start_size = START_BUFFER_SIZE;
@@ -102,10 +106,21 @@ int main(int argc, char **argv) {
     }
 
     // Create AST based on token buffer
-    ASTNode ast;
-    Result ast_result = build_ast(&tokens, &ast);
+    //ASTNode ast;
+    //Result ast_result = build_ast(&tokens, &ast);
 
+    /*------------ DEBUGGING ARENA ------------ */
+    #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
+        Arena a = {0};
+        arena_init(&a, 256);
+
+        test_arena_all(&a);
+
+        arena_destroy(&a);
+    #endif
+    /*------------ DEBUGGING ARENA ------------ */
     
+    // Free all memory
     free(tokens.data);
     free_source(&source_file);
     

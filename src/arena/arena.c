@@ -138,7 +138,7 @@ int arena_destroy(Arena* arena) {
 }
 
 int arena_reset(Arena* arena) {
-    if (!arena->start_block) {
+    if (arena->start_block == NULL) {
         fprintf(stderr, "Failed to reset arena: Arena has no start block.");
         return 1;
     }
