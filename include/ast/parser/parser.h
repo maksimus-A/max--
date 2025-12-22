@@ -1,3 +1,4 @@
+#include "arena/arena.h"
 #include "ast/lexer/lexer.h"
 #include <stddef.h>
 
@@ -57,4 +58,15 @@ struct ASTNode {
 
 };
 
-Result build_ast(TokenBuffer* tokens, ASTNode* ast);
+// Stores current index in parsing,
+typedef struct Parser Parser;
+struct Parser {
+    TokenBuffer* tokens;
+    int token_index;
+    Arena* ast_arena;
+    // TODO: Make more robust error_list struct for reporting compiler errors nicely
+    char** error_list;
+};
+
+ASTNode* build_ast(Parser* parser);
+int initialize_parser(Parser* parser, Arena* arena, TokenBuffer* tokens);

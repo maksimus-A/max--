@@ -1,3 +1,4 @@
+#include <stdalign.h>
 #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
 #include "arena/arena_test.h"
 #endif
@@ -77,6 +78,10 @@ int main(int argc, char **argv) {
     Source source_file;
     // TODO: Check result of filling buffer for errors
     Result buffer_result  = read_source_file(fp, &source_file);
+    if (buffer_result.error_code != 0) {
+        fprintf(stderr, "Error filling buffer: %s", buffer_result.error_message);
+        return 1;
+    }
     fclose(fp);
 
     if (args.debug) {
@@ -97,17 +102,33 @@ int main(int argc, char **argv) {
     if (lex_result.error_code != 0) {
         fprintf(stderr, "Error lexing arguments: %s", lex_result.error_message);
     }
+    if (!last_token_is_EOF(&tokens)) {
+        fprintf(stderr, "Lexing error: last token was not end of file.");
+        return 1;
+    }
 
     if (args.debug) {
         print_all_tokens(&tokens, source_file.buffer);
         printf("\n");
         pretty_print_tokens(&tokens, source_file.buffer);
-        printf("---------------------");
+        printf("---------------------\n\n");
     }
 
+
+
     // Create AST based on token buffer
-    //ASTNode ast;
-    //Result ast_result = build_ast(&tokens, &ast);
+    Arena arena;
+    if (!arena_init(&arena, DEFAULT_BLOCK_SIZE)) {
+        fprintf(stderr, "Failed to initialize arena.");
+        return 2;
+    }
+    Parser parser;
+    if (!initialize_parser(&parser, &arena, &tokens)) {
+        fprintf(stderr, "Failed to initialize parser.");
+        return 3;
+    }
+
+    ASTNode* ast_root = build_ast(&parser);
 
     /*------------ DEBUGGING ARENA ------------ */
     #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS

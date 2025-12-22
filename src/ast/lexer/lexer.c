@@ -170,7 +170,7 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
     int line = 1;
     int col = 0;
 
-    while (i < source_file->length) {
+    while ((size_t)i < source_file->length) {
         char c = source_file->buffer[i];
         // TODO: keyword finder, func finder?
         // FOR NOW WE TRY TO SUPPORT:
@@ -307,6 +307,13 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
         col++;
         i++;
     }
+
+    Token token = set_token(TOK_EOF, i, line, col, 1);
+    push_token(tokens, token);
+
     return result;
 }
 
+int last_token_is_EOF(TokenBuffer* tokens) {
+    return tokens->data[tokens->count-1].token_kind == TOK_EOF;
+}

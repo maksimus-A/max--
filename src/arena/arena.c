@@ -6,7 +6,6 @@
 #include "arena/arena.h"
 
 #define MAX_ALIGN alignof(max_align_t)
-#define DEFAULT_BLOCK_SIZE (1<<16) // 2 ^ 16, ~64KB
 
 size_t max(size_t a, size_t b) {
     if (a > b) {

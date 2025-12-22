@@ -14,7 +14,6 @@ fn_decl: FN IDENTIFIER((IDENTIFIER: (type) (, IDENTIFIER: type)?)): type? {(decl
 stmt: assn_stmt
     | if_stmt
     | while_stmt
-    | cond_stmt
     | block_stmt
     | ret_stmt
     ;

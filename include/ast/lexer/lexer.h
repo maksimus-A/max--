@@ -69,3 +69,5 @@ struct TokenBuffer {
 
 Result lex_input(TokenBuffer* tokens, Source* source_file);
 
+int last_token_is_EOF(TokenBuffer* tokens);
+
