@@ -1,0 +1,54 @@
+# Just a rough idea of what the grammar should look like for max--, for my own reference.
+
+program: (decl|stmt)* EOF;
+
+decl: int_decl
+    | fn_decl
+    ; #TODO: Add more decls
+
+int_decl: INT IDENTIFIER = expr;
+        ;
+fn_decl: FN IDENTIFIER((IDENTIFIER: (type) (, IDENTIFIER: type)?)): type? {(decl|stmt)*}
+
+
+stmt: assn_stmt
+    | if_stmt
+    | while_stmt
+    | cond_stmt
+    | block_stmt
+    | ret_stmt
+    ;
+
+assn_stmt: TYPE IDENTIFIER = expr;
+        ;
+if_stmt: IF (COND) block_stmt;
+        ;
+while_stmt: WHILE (COND) block_stmt;
+        ;
+block_stmt: {decl|stmt};
+        ;
+ret_stmt: RETURN expr?;
+        ;
+
+expr: expr (*|/) expr
+    | expr (+|-) expr
+    | expr (('<' | '==') expr)?
+    | INT_LITERAL;
+
+
+# GPT_GENERATED GRAMMAR:
+program := (int_decl | stmt)* EOF
+
+int_decl := 'int' IDENT '=' expr ';'
+
+stmt := block | if | while | return | expr_stmt
+
+expr_stmt := expr ';'
+
+block := '{' (int_decl | stmt)* '}'
+
+if := 'if' '(' cond ')' stmt
+
+while := 'while' '(' cond ')' stmt
+
+cond := expr ('<' | '==') expr
