@@ -61,6 +61,7 @@ int arena_add_block(Arena* arena, size_t size) {
         printf("Block allocation failed.");
         return 0;
     }
+    
     if (arena->curr_block) {
         arena->curr_block->next = new_block;
         arena->curr_block = new_block;
@@ -93,7 +94,7 @@ void* current_ptr(Arena* arena, size_t aligned_used) {
 void* arena_alloc(Arena* arena, size_t size, size_t align) {
 
     if (arena->curr_block == NULL) {
-        arena_add_block(arena, size);
+        arena_add_block(arena, choose_block_size(size));
     }
 
     size_t aligned_used = round_up(arena->curr_block->used, align);
