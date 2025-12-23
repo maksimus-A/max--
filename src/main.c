@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
         return 3;
     }
 
-    ASTNode* ast_root = build_ast(&parser);
+    ASTNode* ast_root = build_ast(&parser, &source_file);
 
     /*------------ DEBUGGING ARENA ------------ */
     #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS

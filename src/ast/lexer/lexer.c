@@ -6,6 +6,7 @@
 #include "ast/lexer/lexer.h"
 
 // TODO: Consider putting helpers inside 'lexer_helper.c' or something
+// TODO: Lex negative integers.
 
 static inline int is_ident_starter(char c) {
     return isalpha((unsigned char)c) || c == '_';

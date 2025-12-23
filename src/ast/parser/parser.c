@@ -1,9 +1,15 @@
 #include <stdalign.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 #include "ast/lexer/lexer.h"
 #include "ast/parser/parser.h"
+#include "ast/parser/ast.h"
 #include "arena/arena.h"
+
+#define AST_DEFAULT_CAPACITY 32
+
+/*--------- HELPERS --------- */
 
 /* Peeks n tokens ahead (or behind?) and returns the token, unless EOF.*/
 Token peek_n(Parser* parser, int n) {
@@ -17,12 +23,12 @@ Token peek_n(Parser* parser, int n) {
     return parser->tokens->data[parser->tokens->count-1];
 }
 
-/* Get next token in tokens */
+/* Get next token in tokens. Does not advance token index. */
 Token next(Parser* parser) {
     return peek_n(parser, 1);
 }
 
-/* Grab current token in tokens */
+/* Grab current token in tokens, does not advance token index */
 Token current(Parser* parser) {
     return peek_n(parser, 0);
 }
@@ -34,7 +40,9 @@ void advance_n(Parser* parser, int n) {
     if (token_index + n < total_token_count) {
         parser->token_index += n;
     }
-    parser->token_index = parser->tokens->count-1;
+    else {
+        parser->token_index = parser->tokens->count-1;
+    }
     // TODO: Return some error msg? Or that we reached EOF?
 }
 
@@ -65,6 +73,9 @@ int match_one_of_kinds(Parser* parser, enum TokenKind* kind, int size) {
     }
     return 0;
 }
+
+/*--------- VISIT_[NODE] --------- */
+
 
 // True if current token starts a declaration
 int starts_decl(Parser* parser) {
@@ -109,14 +120,15 @@ int starts_stmt(Parser* parser) {
 }
 
 // Create a span struct for metadata storage
-SrcSpan create_span_from(int i, int start_mark) {
+SrcSpan create_span_from(int start_mark, int end_mark) {
     SrcSpan span;
     span.start = start_mark;
-    span.length = i - start_mark;
+    span.length = end_mark - start_mark;
 
     return span;
 }
 
+/*--------- ERROR RECOVERY ---------*/
 /*Help recover from syntax errors by syncing to
  closest statment boundary or EOF.*/
 int sync_to_boundary(Parser* parser) {
@@ -141,16 +153,162 @@ int expect_semicolon_or_recover(Parser* parser) {
         if (match_kind(parser, SEMICOLON)) break;
         parser->token_index++;
     }
+    // TODO: This should probably return an error since we reached EOF.
     return parser->token_index;
 }
 
+/*--------- PARSING HELPERS ---------*/
+SrcSpan get_decl_name_span(Parser* parser) {
+    // TODO*: This also consumes tokens up until
+    // an '=' is seen. MAKE IT ANOTHER HELPER!
+
+    // This might be a useless helper since I could use
+    // create_span_from. oops
+    SrcSpan name_span = create_span_from(next(parser).start, next(parser).start + next(parser).length);
+    if (next(parser).token_kind == IDENTIFIER) {
+        // Find start of expression
+        while (parser->tokens->data[parser->token_index].token_kind != EQ
+                && parser->tokens->data[parser->token_index].token_kind != TOK_EOF) {
+            parser->token_index++;
+        }
+        parser->token_index++;
+
+        return name_span;
+    }
+    else {
+        // TODO: Error handle in case next is not identifier.
+        // could 'semicolon or recover'?
+        name_span.start = -1;
+        name_span.length = -1;
+    }
+    return name_span;
+}
+
+long get_int_lit_value(Parser* parser, Source* source_file) {
+    // TODO: Maybe move into lexer?
+    int index = parser->token_index;
+    int start = parser->tokens->data[index].start;
+    int end = start + parser->tokens->data[index].length;
+
+    long value = 0;
+    for (int i = start; i < end; i++) {
+        char c = source_file->buffer[i];
+        if (c < '0' || c > '9') {
+            // error: non-digit in integer literal
+            value = -1;
+            break;
+        }
+        int digit = c - '0';
+        // TODO: Add overflow check
+        value = value * 10 + digit;
+    }
+
+    return value;
+}
+
+/*--------- PARSE_{NODE} ---------*/
+ASTNode* parse_expr(Parser* parser, Source* source_file) {
+    // TODO*: Move token_index to end of expression.
+    ASTNode* expr = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+
+    if (current(parser).token_kind == INT_LITERAL) {
+        // TODO: Decide if this is AST_INT_LIT or AST_EXPR.
+        expr->ast_kind = AST_INT_LIT;
+        expr->node_info.int_lit = (IntLitInfo) {
+            .value = get_int_lit_value(parser, source_file)
+        };
+
+    }
+    // TODO: Parse real expressions, not just integer literals.
+    // TODO*: This returns the index, regardless of EOF or not.
+    // Might need to change.
+
+    // Move token index to token AFTER semicolon
+    expect_semicolon_or_recover(parser);
+
+    return expr;
+}
+
+ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
+
+    ASTNode* int_decl = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+    int_decl->ast_kind = AST_VAR_DEC;
+
+    int_decl->node_info.var_decl = (struct VarDeclInfo){
+        .name_span = get_decl_name_span(parser),
+        .type = TYPE_INT,
+        .init_expr = parse_expr(parser, source_file)
+    };
+    // parse_expr moves the pointer to the start of the next stmt/decl/etc
+    
+    return int_decl;
+}
+
+/*------ ITEM HELPER ------ */
+void ensure_item_capacity(Parser* parser, ASTNode* ast_root) {
+    if (ast_root->node_info.program.capacity == ast_root->node_info.program.count) {
+        size_t new_capacity = ast_root->node_info.program.capacity * 2;
+        ASTNode** new_items = (ASTNode**)arena_alloc(parser->ast_arena, new_capacity * sizeof(ASTNode*), alignof(ASTNode*));
+        if (!new_items) {
+            // TODO: Error handle better.
+            fprintf(stderr, "ERROR: Could not allocate new items list for 'program' from arena.");
+            return;
+        }
+        if (ast_root->node_info.program.count > 0) {
+            memcpy(new_items, ast_root->node_info.program.items, ast_root->node_info.program.count * sizeof(ASTNode*));
+        }
+        ast_root->node_info.program.capacity = new_capacity;
+        ast_root->node_info.program.items = new_items;
+        return;
+    }
+}
+
+void push_node(Parser* parser, ASTNode* ast_root, ASTNode* node) {
+    // TODO: Handle errors pushing ast_root!
+    ensure_item_capacity(parser, ast_root);
+
+    size_t count = ast_root->node_info.program.count;
+    ast_root->node_info.program.items[count] = node;
+    ast_root->node_info.program.count++;
+}
+
+
+
 // TODO: Since THIS is allocating the arena, this should also probably free it later.
 // I think that makes the most sense.
-ASTNode* build_ast(Parser* parser) {
+ASTNode* build_ast(Parser* parser, Source* source_file) {
 
-    ASTNode* ast_root = (ASTNode*)arena_alloc(parser->ast_arena, choose_block_size(sizeof(ASTNode)), alignof(ASTNode));
+    ASTNode* ast_root = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
 
-    
+    ast_root->ast_kind = AST_PROGRAM;
+    ast_root->span = create_span_from(parser->token_index, parser->tokens->count-1);
+    ast_root->node_info.program = (ProgramInfo) {
+        .items = (ASTNode**)arena_alloc(parser->ast_arena, AST_DEFAULT_CAPACITY * sizeof(ASTNode*), alignof(ASTNode*)),
+        .capacity = AST_DEFAULT_CAPACITY,
+        .count = 0
+    };
+    while (parser->tokens->data[parser->token_index].token_kind != TOK_EOF) {
+        int index = parser->token_index;
+        if (starts_decl(parser)) {
+            switch (parser->tokens->data[index].token_kind) {
+                case INT:
+                    if (next(parser).token_kind == IDENTIFIER) {
+                        ASTNode* int_decl = parse_int_decl(parser, source_file);
+                        push_node(parser, ast_root, int_decl);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        else {
+            //TODO* Remove this once more things r implemented.
+            // I want each 'parse_x' to advance the pointer.
+            parser->token_index++;
+        }
+        /*I define parse_{node} for each node. */
+        
+    }
     /*
     Idea:
     recursive descent. Start with visit_program()
