@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "common.h"
@@ -35,4 +36,27 @@ Result read_source_file(FILE* fp, Source* out) {
 
 void free_source(Source* source) {
     free(source->buffer);
+}
+
+// Computes line and column based on current start location.
+LineCol get_line_col_from_span(size_t start_loc, Source* source_file) {
+    assert(start_loc <= source_file->length);
+    LineCol line_col;
+    line_col.line = 1;
+    line_col.col = 1;
+
+    size_t index = 0;
+    while (index < start_loc) {
+        char current_char = source_file->buffer[index];
+        if (current_char == '\n') {
+            line_col.line++;
+            line_col.col = 1;
+        }
+        else {
+            line_col.col++;    
+        }
+        index++;
+    }
+
+    return line_col;
 }

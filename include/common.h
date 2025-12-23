@@ -20,5 +20,12 @@ struct Source { // Source file
 };
 typedef struct Source Source;
 
+typedef struct LineCol {
+    size_t line;
+    size_t col;
+} LineCol;
+
 Result read_source_file(FILE* fp, Source* out); // Should return buffer of file ??
 void free_source(Source* s);
+
+LineCol get_line_col_from_span(size_t start_loc, Source* source_file);

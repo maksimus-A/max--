@@ -7,6 +7,7 @@
 #include "ast/parser/ast.h"
 #include "arena/arena.h"
 #include "debug.h"
+#include "common.h"
 
 #define AST_DEFAULT_CAPACITY 32
 #define DEFAULT_ERR_MSG_SIZE 100
@@ -52,8 +53,12 @@ int expect(Parser* parser, enum TokenKind kind, char* err_msg) {
         const char* curr_token_str = token_kind_str[curr_token];
         const char* expected_token_str = token_kind_str[kind];
 
+        LineCol line_col;
+        line_col.line = current(parser).line;
+        line_col.col = current(parser).col;
+
         // Todo: Check which token was expected.
-        int res = snprintf(err_msg, DEFAULT_ERR_MSG_SIZE, "Error: expected %s after %s", expected_token_str, curr_token_str);
+        int res = snprintf(err_msg, DEFAULT_ERR_MSG_SIZE, "Error at (%zu:%zu): expected %s after %s", line_col.line, line_col.col, expected_token_str, curr_token_str);
         return 0;
     }
 }
@@ -188,31 +193,6 @@ int expect_semicolon_or_recover(Parser* parser) {
 }
 
 /*--------- PARSING HELPERS ---------*/
-/*
-SrcSpan get_decl_name_span(Parser* parser) {
-    // TODO*: This also consumes tokens up until
-    // an '=' is seen. MAKE IT ANOTHER HELPER!
-
-    // This might be a useless helper since I could use
-    SrcSpan name_span = create_span_from(next(parser).start, next(parser).start + next(parser).length);
-    if (next(parser).token_kind == IDENTIFIER) {
-        // Find start of expression
-        while (parser->tokens->data[parser->token_index].token_kind != EQ
-                && parser->tokens->data[parser->token_index].token_kind != TOK_EOF) {
-            parser->token_index++;
-        }
-        parser->token_index++;
-
-        return name_span;
-    }
-    else {
-        // TODO: Error handle in case next is not identifier.
-        // could 'semicolon or recover'?
-        name_span.start = -1;
-        name_span.length = -1;
-    }
-    return name_span;
-} */
 
 long get_int_lit_value(Parser* parser, Source* source_file) {
     // TODO: Maybe move into lexer?
