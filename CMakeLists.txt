@@ -24,9 +24,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ${MAXC_EXPORT_COMPILE_COMMANDS})
 set(MAXC_SOURCES
     src/main.c
     src/ast/lexer/lexer.c
+    src/ast/ast_node.c
+    src/ast/parser/parser.c
+    src/ast/parser/ast_printer.c
     src/debug.c
     src/common.c
-    src/ast/ast_node.c
     src/arena/arena.c
 )
 

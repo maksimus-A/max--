@@ -58,10 +58,10 @@ int arena_add_block(Arena* arena, size_t size) {
     MemBlock* new_block = create_block(size);
     if (new_block == NULL) {
         // TODO: Error handle idk
-        printf("Block allocation failed.");
+        fprintf(stderr, "Block allocation failed: new block was NULL.");
         return 0;
     }
-    
+
     if (arena->curr_block) {
         arena->curr_block->next = new_block;
         arena->curr_block = new_block;
@@ -113,16 +113,16 @@ void* arena_alloc(Arena* arena, size_t size, size_t align) {
 
 int arena_init(Arena* arena, size_t size) {
     if (!arena_add_block(arena, choose_block_size(size))) {
-        fprintf(stderr, "Failed to initialize arena.");
-        return 1;
+        fprintf(stderr, "Failed to initialize arena: adding block failed.");
+        return 0;
     }
-    return 0;
+    return 1;
 }
 
 int arena_destroy(Arena* arena) {
     if (!arena || !arena->start_block) {
         fprintf(stderr, "Failed to destroy arena: Arena has no start block.\n");
-        return 1;
+        return 0;
     }
 
     MemBlock* block = arena->start_block;
@@ -134,7 +134,7 @@ int arena_destroy(Arena* arena) {
 
     arena->start_block = NULL;
     arena->curr_block = NULL;
-    return 0;
+    return 1;
 }
 
 int arena_reset(Arena* arena) {

@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "ast/lexer/lexer.h"
 #include "ast/parser/parser.h"
+#include "ast/parser/ast_printer.h"
 #include "arena/arena.h"
 #include "common.h"
 
@@ -119,17 +120,27 @@ int main(int argc, char **argv) {
     // Create AST based on token buffer
     Arena arena;
     if (!arena_init(&arena, DEFAULT_BLOCK_SIZE)) {
-        fprintf(stderr, "Failed to initialize arena.");
+        fprintf(stderr, "Failed to initialize arena in main.");
         return 2;
     }
     Parser parser;
     if (!initialize_parser(&parser, &arena, &tokens)) {
         fprintf(stderr, "Failed to initialize parser.");
+        return 2;
+    }
+
+    // Parse tokens and construct AST.
+    ASTNode* ast_root = build_ast(&parser, &source_file);
+    if (print_parser_err_msgs(&parser)) {
+        printf("Compilation failed with %zu errors.", parser.error_list_size);
         return 3;
     }
 
-    ASTNode* ast_root = build_ast(&parser, &source_file);
-
+    if (args.debug) {
+        printf("------------- AST -------------\n");
+        dump_ast(ast_root, &source_file, 0);
+    }
+    
     /*------------ DEBUGGING ARENA ------------ */
     #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
         Arena a = {0};
@@ -144,6 +155,7 @@ int main(int argc, char **argv) {
     // Free all memory
     free(tokens.data);
     free_source(&source_file);
+    free_ast_arena(&parser);
     
     return 0;
 

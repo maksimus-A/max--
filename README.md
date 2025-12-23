@@ -8,6 +8,12 @@ Right now I'm focusing on max-1, a simple, minimal language spec I can use to he
 
 The language will only compile to x86. I could have used LLVM as my target but I wanted to also learn about the backend compilation process.
 
+## Current Progress
+
+Currently lexes functions and integer declarations, and parses integer declarations only.
+
+Working on better error reporting for the parser.
+
 ## Basic setup
 
 - Run `./compile.sh`. It'll take care of everything for you :)

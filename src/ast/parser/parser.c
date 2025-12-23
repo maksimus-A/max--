@@ -6,11 +6,13 @@
 #include "ast/parser/parser.h"
 #include "ast/parser/ast.h"
 #include "arena/arena.h"
+#include "debug.h"
 
 #define AST_DEFAULT_CAPACITY 32
+#define DEFAULT_ERR_MSG_SIZE 100
 
 /*--------- HELPERS --------- */
-
+// Checkers
 /* Peeks n tokens ahead (or behind?) and returns the token, unless EOF.*/
 Token peek_n(Parser* parser, int n) {
     int token_index = parser->token_index;
@@ -33,27 +35,57 @@ Token current(Parser* parser) {
     return peek_n(parser, 0);
 }
 
+// Consumers
+/* Returns true if CURRENT token matches expectation (& consume), false otherwise.
+ Used when next token is mandatory.*/
+int expect(Parser* parser, enum TokenKind kind, char* err_msg) {
+    if (current(parser).token_kind == kind) {
+        parser->token_index++;
+        return 1;
+    }
+    else {
+        // Error handling by returning expected tokens.
+        int curr_index = parser->token_index;
+
+        assert((size_t)curr_index + 1 <= parser->tokens->count);
+        enum TokenKind curr_token = parser->tokens->data[curr_index].token_kind;
+        const char* curr_token_str = token_kind_str[curr_token];
+        const char* expected_token_str = token_kind_str[kind];
+
+        // Todo: Check which token was expected.
+        int res = snprintf(err_msg, DEFAULT_ERR_MSG_SIZE, "Error: expected %s after %s", expected_token_str, curr_token_str);
+        return 0;
+    }
+}
+
 // Advance our token pointer by n tokens (or EOF)
-void advance_n(Parser* parser, int n) {
+int advance_n(Parser* parser, int n) {
     int token_index = parser->token_index;
     int total_token_count = parser->tokens->count;
     if (token_index + n < total_token_count) {
         parser->token_index += n;
+        return 1;
     }
     else {
         parser->token_index = parser->tokens->count-1;
+        return 0;
     }
-    // TODO: Return some error msg? Or that we reached EOF?
+    // TODO: Use T/F returned from this
 }
 
-// Returns true if tokens match, and consumes token
+// Advance token pointer by 1 token (or to EOF)
+int advance(Parser* parser) {
+    return advance_n(parser, 1);
+}
+
+// Returns true if CURRENT tokens match, and consumes token. 
+// Used when next token is optional.
 int match_kind(Parser* parser, enum TokenKind kind) {
     if (parser->token_index >= (int)parser->tokens->count-1) {
         return 0;
     }
 
-    if (parser->tokens->data[parser->token_index].token_kind == kind) {
-
+    if (current(parser).token_kind == kind) {
         parser->token_index++;
         return 1;
     }
@@ -66,7 +98,7 @@ int match_one_of_kinds(Parser* parser, enum TokenKind* kind, int size) {
         return 0;
     }
     for (int j = 0; j < size; j++) {
-        if (parser->tokens->data[parser->token_index].token_kind == kind[j]) {
+        if (current(parser).token_kind == kind[j]) {
             parser->token_index++;
             return 1;
         }
@@ -99,8 +131,6 @@ int starts_decl(Parser* parser) {
 int starts_stmt(Parser* parser) {
     switch (current(parser).token_kind) {
         // TODO: Add rest of statements.
-        // Consider making a 'TYPE' that
-        // encapsulates all types as checks.
         case IF:
             return 1;
             break;
@@ -158,12 +188,12 @@ int expect_semicolon_or_recover(Parser* parser) {
 }
 
 /*--------- PARSING HELPERS ---------*/
+/*
 SrcSpan get_decl_name_span(Parser* parser) {
     // TODO*: This also consumes tokens up until
     // an '=' is seen. MAKE IT ANOTHER HELPER!
 
     // This might be a useless helper since I could use
-    // create_span_from. oops
     SrcSpan name_span = create_span_from(next(parser).start, next(parser).start + next(parser).length);
     if (next(parser).token_kind == IDENTIFIER) {
         // Find start of expression
@@ -182,7 +212,7 @@ SrcSpan get_decl_name_span(Parser* parser) {
         name_span.length = -1;
     }
     return name_span;
-}
+} */
 
 long get_int_lit_value(Parser* parser, Source* source_file) {
     // TODO: Maybe move into lexer?
@@ -217,30 +247,66 @@ ASTNode* parse_expr(Parser* parser, Source* source_file) {
         expr->node_info.int_lit = (IntLitInfo) {
             .value = get_int_lit_value(parser, source_file)
         };
-
+        advance(parser);
     }
     // TODO: Parse real expressions, not just integer literals.
-    // TODO*: This returns the index, regardless of EOF or not.
-    // Might need to change.
-
-    // Move token index to token AFTER semicolon
-    expect_semicolon_or_recover(parser);
 
     return expr;
 }
 
 ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
+    /*  Parses:
+        int x;
+        int x = {expr};
+        Pointer assumed to be at 'INT'.
+    */
 
     ASTNode* int_decl = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     int_decl->ast_kind = AST_VAR_DEC;
 
-    int_decl->node_info.var_decl = (struct VarDeclInfo){
-        .name_span = get_decl_name_span(parser),
-        .type = TYPE_INT,
-        .init_expr = parse_expr(parser, source_file)
-    };
-    // parse_expr moves the pointer to the start of the next stmt/decl/etc
+    // TODO: Append err message to err message list in parser
+    char* err_msg = arena_alloc(parser->ast_arena,
+                            DEFAULT_ERR_MSG_SIZE,
+                            alignof(char));
+    // Find identifier, store its span
+    advance(parser);
+    SrcSpan name_span;
+    if (expect(parser, IDENTIFIER, err_msg)) {
+        name_span = create_span_from(parser->tokens->data[parser->token_index-1].start, 
+            parser->tokens->data[parser->token_index-1].start + parser->tokens->data[parser->token_index-1].length);
+    }
+    else {
+        // Move pointer to next safe boundary
+        // TODO: Error check harder?
+        add_err_msg(parser, err_msg);
+        expect_semicolon_or_recover(parser);
+        return int_decl;
+    }
+
+    // Check type of declaration (assignment or pure decl)
+    if (match_kind(parser, EQ)) {
+        ASTNode* expr_node = parse_expr(parser, source_file);
+
+        int_decl->node_info.var_decl = (struct VarDeclInfo){
+            .name_span = name_span,
+            .type = TYPE_INT,
+            .init_expr = expr_node
+        };
+    }
+    else {
+        // TODO: Get specific identifier name and append to error list.
+        add_err_msg(parser, "Error: expected '=' after IDENTIFIER");
+        expect_semicolon_or_recover(parser);
+        return int_decl;
+    }
     
+    char* err_msg_2 = arena_alloc(parser->ast_arena,
+                            DEFAULT_ERR_MSG_SIZE,
+                            alignof(char));
+    if (!expect(parser, SEMICOLON, err_msg_2)) {
+        add_err_msg(parser, err_msg_2);
+    }
+
     return int_decl;
 }
 
@@ -272,6 +338,25 @@ void push_node(Parser* parser, ASTNode* ast_root, ASTNode* node) {
     ast_root->node_info.program.count++;
 }
 
+/*------ ERROR MESSAGE HELPERS ------*/
+
+// Adds error message to error list during parsing.
+void add_err_msg(Parser* parser, char* err_msg) {
+    if (parser->error_list_size < DEFAULT_ERROR_LIST_SIZE) {
+        parser->error_list[parser->error_list_size] = err_msg;
+        parser->error_list_size++;
+    }
+}
+
+// True if errors were present.
+int print_parser_err_msgs(Parser* parser) {
+    if (parser->error_list_size == 0) return 0;
+    fprintf(stdout, "Parser errors:\n");
+    for (int i = 0; i < parser->error_list_size; i++) {
+        fprintf(stdout, "%s\n", parser->error_list[i]);
+    }
+    return 1;
+}
 
 
 // TODO: Since THIS is allocating the arena, this should also probably free it later.
@@ -292,9 +377,14 @@ ASTNode* build_ast(Parser* parser, Source* source_file) {
         if (starts_decl(parser)) {
             switch (parser->tokens->data[index].token_kind) {
                 case INT:
+                    // TODO: Just call 'parse_int_decl' and let that handle missing identifier.
                     if (next(parser).token_kind == IDENTIFIER) {
                         ASTNode* int_decl = parse_int_decl(parser, source_file);
                         push_node(parser, ast_root, int_decl);
+                    }
+                    else {
+                        add_err_msg(parser, "Expected 'IDENTIFIER' after 'int'.");
+                        expect_semicolon_or_recover(parser);
                     }
                     break;
                 default:
@@ -309,34 +399,22 @@ ASTNode* build_ast(Parser* parser, Source* source_file) {
         /*I define parse_{node} for each node. */
         
     }
-    /*
-    Idea:
-    recursive descent. Start with visit_program()
-    visit_program:
-        visits every single subtype inside of ASTKind
-        Reads syntax
-        Determines what AstKind and assign
-        Stores buffer length + start
-        Store metadata
-        If any metadata requires a recursive call:
-        Recursively call
-    
-    */
-
+    return ast_root;
 }
 
 
 int initialize_parser(Parser* parser, Arena* arena, TokenBuffer* tokens) {
-    // TODO: Error check this?
-    // but tbh i don't see how it could fail.
     parser->ast_arena = arena;
     parser->token_index = 0;
     parser->tokens = tokens;
-    // TODO: Error list init
+    parser->error_list_size = 0;
     return 1;
 }
 
 int free_ast_arena(Parser* parser) {
-    // TODO: Implement this
+    if (!arena_destroy(parser->ast_arena)) {
+        fprintf(stderr, "Failed to destroy AST arena.");
+        return 1;
+    }
     return 0;
 }

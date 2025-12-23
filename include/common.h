@@ -9,7 +9,7 @@
 struct Result {
     int error_code;
     const char* error_message;
-    void* data; // TODO:CHECK??
+    void* data; // TODO:CHECK if necessary?
 };
 typedef struct Result Result;
 

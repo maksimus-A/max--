@@ -17,7 +17,8 @@ typedef enum ASTKind {
 typedef enum BuiltInType {
     TYPE_INT,
     TYPE_BOOL,
-    TYPE_CHAR
+    TYPE_CHAR,
+    TYPE_TOTAL_COUNT
     // todo: add more types as we go
 } BuiltInType;
 
