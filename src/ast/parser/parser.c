@@ -12,6 +12,8 @@
 #define AST_DEFAULT_CAPACITY 32
 #define DEFAULT_ERR_MSG_SIZE 100
 
+void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond);
+
 /*--------- HELPERS --------- */
 // Checkers
 /* Peeks n tokens ahead (or behind?) and returns the token, unless EOF.*/
@@ -290,32 +292,55 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     return int_decl;
 }
 
+// Parses statements/decls inside block. Assumes { was consumed.
+ASTNode* parse_block_node(Parser* parser, Source* source_file) {
+    ASTNode* block_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+    block_node->ast_kind = AST_BLOCK;
+
+    block_node->node_info.block_info.body = (NodeList) {
+        .items = (ASTNode**)arena_alloc(parser->ast_arena, AST_DEFAULT_CAPACITY * sizeof(ASTNode*), alignof(ASTNode*)),
+        .capacity = AST_DEFAULT_CAPACITY,
+        .count = 0
+    };
+
+    // Recursively fill items from while expr inside build_ast?
+    // Make it a sub-routine?
+    parse_item_list(parser, &block_node->node_info.block_info.body, source_file, CUR_BRACK_END);
+    if (current(parser).token_kind == CUR_BRACK_END) advance(parser);
+    else {
+        add_err_msg(parser, "Expected '}'.", current(parser).line, current(parser).col);
+        sync_to_boundary(parser);
+    }
+
+    return block_node;
+}
+
 /*------ ITEM HELPER ------ */
-void ensure_item_capacity(Parser* parser, ASTNode* ast_root) {
-    if (ast_root->node_info.program.capacity == ast_root->node_info.program.count) {
-        size_t new_capacity = ast_root->node_info.program.capacity * 2;
+void ensure_item_capacity(Parser* parser, NodeList* list) {
+    if (list->capacity == list->count) {
+        size_t new_capacity = list->capacity * 2;
         ASTNode** new_items = (ASTNode**)arena_alloc(parser->ast_arena, new_capacity * sizeof(ASTNode*), alignof(ASTNode*));
         if (!new_items) {
             // TODO: Error handle better.
             fprintf(stderr, "ERROR: Could not allocate new items list for 'program' from arena.");
             return;
         }
-        if (ast_root->node_info.program.count > 0) {
-            memcpy(new_items, ast_root->node_info.program.items, ast_root->node_info.program.count * sizeof(ASTNode*));
+        if (list->count > 0) {
+            memcpy(new_items, list->items, list->count * sizeof(ASTNode*));
         }
-        ast_root->node_info.program.capacity = new_capacity;
-        ast_root->node_info.program.items = new_items;
+        list->capacity = new_capacity;
+        list->items = new_items;
         return;
     }
 }
 
-void push_node(Parser* parser, ASTNode* ast_root, ASTNode* node) {
-    // TODO: Handle errors pushing ast_root!
-    ensure_item_capacity(parser, ast_root);
+void push_node(Parser* parser, NodeList* list, ASTNode* node) {
+    // TODO: Handle errors pushing to list!
+    ensure_item_capacity(parser, list);
 
-    size_t count = ast_root->node_info.program.count;
-    ast_root->node_info.program.items[count] = node;
-    ast_root->node_info.program.count++;
+    size_t count = list->count;
+    list->items[count] = node;
+    list->count++;
 }
 
 /*------ ERROR MESSAGE HELPERS ------*/
@@ -325,6 +350,7 @@ void add_err_msg(Parser* parser, char* err_msg, size_t line, size_t col) {
     char* new_err_msg = arena_alloc(parser->ast_arena,
                             DEFAULT_ERR_MSG_SIZE,
                             alignof(char));
+
     snprintf(new_err_msg, DEFAULT_ERR_MSG_SIZE, "Error at (%zu:%zu): %s", line, col, err_msg);
     if (parser->error_list_size < DEFAULT_ERROR_LIST_SIZE) {
         parser->error_list[parser->error_list_size] = new_err_msg;
@@ -342,26 +368,16 @@ int print_parser_err_msgs(Parser* parser) {
     return 1;
 }
 
-ASTNode* build_ast(Parser* parser, Source* source_file) {
+void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond) {
 
-    ASTNode* ast_root = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
-
-    ast_root->ast_kind = AST_PROGRAM;
-    ast_root->span = create_span_from(parser->token_index, parser->tokens->count-1);
-    ast_root->node_info.program = (ProgramInfo) {
-        .items = (ASTNode**)arena_alloc(parser->ast_arena, AST_DEFAULT_CAPACITY * sizeof(ASTNode*), alignof(ASTNode*)),
-        .capacity = AST_DEFAULT_CAPACITY,
-        .count = 0
-    };
-    while (parser->tokens->data[parser->token_index].token_kind != TOK_EOF) {
-        int index = parser->token_index;
+    while (current(parser).token_kind != stop_cond && current(parser).token_kind != TOK_EOF) {
         if (starts_decl(parser)) {
-            switch (parser->tokens->data[index].token_kind) {
+            switch (current(parser).token_kind) {
                 case INT:
                     // TODO: Just call 'parse_int_decl' and let that handle missing identifier.
                     if (next(parser).token_kind == IDENTIFIER) {
                         ASTNode* int_decl = parse_int_decl(parser, source_file);
-                        push_node(parser, ast_root, int_decl);
+                        push_node(parser, list, int_decl);
                     }
                     else {
                         add_err_msg(parser, "Expected 'IDENTIFIER' after 'int'.", current(parser).line, current(parser).col);
@@ -372,6 +388,11 @@ ASTNode* build_ast(Parser* parser, Source* source_file) {
                     break;
             }
         }
+        else if (current(parser).token_kind == CUR_BRACK_START) {
+            advance(parser);
+            ASTNode* block_node = parse_block_node(parser, source_file);
+            push_node(parser, list, block_node);
+        }
         else {
             add_err_msg(parser, "Unexpected token.", current(parser).line, current(parser).col);
             //TODO* Remove this once more things r implemented.
@@ -381,8 +402,22 @@ ASTNode* build_ast(Parser* parser, Source* source_file) {
 
         // todo: Error checking after each built node
         /*I define parse_{node} for each node. */
-        
     }
+}
+
+ASTNode* build_ast(Parser* parser, Source* source_file) {
+
+    ASTNode* ast_root = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+
+    ast_root->ast_kind = AST_PROGRAM;
+    ast_root->span = create_span_from(parser->token_index, parser->tokens->count-1);
+    ast_root->node_info.program.body = (NodeList) {
+        .items = (ASTNode**)arena_alloc(parser->ast_arena, AST_DEFAULT_CAPACITY * sizeof(ASTNode*), alignof(ASTNode*)),
+        .capacity = AST_DEFAULT_CAPACITY,
+        .count = 0
+    };
+    parse_item_list(parser, &ast_root->node_info.program.body, source_file, TOK_EOF);
+
     return ast_root;
 }
 

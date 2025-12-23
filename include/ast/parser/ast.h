@@ -12,6 +12,7 @@ typedef enum ASTKind {
     AST_INT_LIT,
     AST_NAME, // identifier expression
     AST_EXPR,
+    AST_BLOCK,
     AST_ERROR
 } ASTKind;
 
@@ -32,11 +33,17 @@ typedef struct SrcSpan {
 } SrcSpan;
 
 /*------- INFORMATION STRUCTS -------*/
-// Entire program
-typedef struct ProgramInfo {
+
+// NodeList (for funcs, program, blocks, etc)
+typedef struct NodeList {
     ASTNode** items;
     size_t count;
     size_t capacity;
+} NodeList;
+
+// Entire program
+typedef struct ProgramInfo {
+    NodeList body;
 } ProgramInfo;
 
 // Primitives
@@ -57,6 +64,11 @@ typedef struct VarNameInfo{
     SrcSpan name_span; // var name
 } VarNameInfo;
 
+// Blocks
+typedef struct BlockInfo {
+    NodeList body;
+} BlockInfo;
+
 // Expressions?
 
 /*------- AST STRUCTS -------*/
@@ -70,6 +82,7 @@ typedef struct ASTNode {
         IntLitInfo int_lit;
         VarDeclInfo var_decl;
         VarNameInfo var_name;
+        BlockInfo block_info;
     } node_info;
 } ASTNode;
 

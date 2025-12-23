@@ -35,7 +35,9 @@ void print_indentation(int indent) {
 /*
 (Program
   (VarDecl type=int name=x
-    (Int_Lit 123)))*/
+    (Int_Lit 123)
+    )
+)*/
 void dump_ast(ASTNode* node, Source* source_file, int indent) {
     print_indentation(indent);
     printf("(");
@@ -44,8 +46,8 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         {
             printf("Program\n");
             indent++;
-            for (size_t i = 0; i < node->node_info.program.count; i++) {
-                dump_ast(node->node_info.program.items[i], source_file, indent);
+            for (size_t i = 0; i < node->node_info.program.body.count; i++) {
+                dump_ast(node->node_info.program.body.items[i], source_file, indent);
             }
             indent--;
             print_indentation(indent);
@@ -54,16 +56,15 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         }
         case AST_VAR_DEC: 
         {
-            VarDeclInfo var_decl = node->node_info.var_decl;
-            SrcSpan name_span = var_decl.name_span;
-            char* start_ptr = start_of_name(name_span, source_file);
+            // TODO: Check if is 'int x;' or 'int x = 0;'
+            char* start_ptr = start_of_name(node->node_info.var_decl.name_span, source_file);
 
-            printf("VarDecl type={%s} name=", get_type_string(var_decl.type));
-            print_file_slice(start_ptr, name_span.length);
+            printf("VarDecl type={%s} name=", get_type_string(node->node_info.var_decl.type));
+            print_file_slice(start_ptr, node->node_info.var_decl.name_span.length);
             printf("\n");
 
             indent++;
-            dump_ast(var_decl.init_expr, source_file, indent);
+            dump_ast(node->node_info.var_decl.init_expr, source_file, indent);
             indent--;
             print_indentation(indent);
             printf(")\n");
@@ -73,6 +74,18 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         {
             IntLitInfo int_lit = node->node_info.int_lit;
             printf("IntLit %ld", int_lit.value);
+            printf(")\n");
+            break;
+        }
+        case AST_BLOCK:
+        {
+            printf("Block\n");
+            indent++;
+            for (size_t i = 0; i < node->node_info.block_info.body.count; i++) {
+                dump_ast(node->node_info.block_info.body.items[i], source_file, indent);
+            }
+            indent--;
+            print_indentation(indent);
             printf(")\n");
             break;
         }
