@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
 
     if (args.debug) {
         printf("%s", source_file.buffer);
-        printf("Buffer size: %d\n\n", (int)source_file.length);
+        printf("\n\nBuffer size: %d\n", (int)source_file.length);
         printf("--------- LEXER ---------\n");
     }
     

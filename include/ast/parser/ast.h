@@ -11,10 +11,12 @@ typedef enum ASTKind {
     AST_VAR_DEC,
     AST_INT_LIT,
     AST_NAME, // identifier expression
-    AST_EXPR
+    AST_EXPR,
+    AST_ERROR
 } ASTKind;
 
 typedef enum BuiltInType {
+    // Always add BuiltInType to string list in ast_printer.c
     TYPE_INT,
     TYPE_BOOL,
     TYPE_CHAR,

@@ -169,12 +169,7 @@ SrcSpan create_span_from(int start_mark, int end_mark) {
 int sync_to_boundary(Parser* parser) {
     while (parser->token_index < (int)parser->tokens->count-1) {
         if (starts_stmt(parser)) break;
-        else if (match_kind(parser, CUR_BRACK_END)) {
-            // don't consume, go to right before
-            // so block parser parses it properly
-            parser->token_index--;
-            break;
-        }
+        else if (current(parser).token_kind == CUR_BRACK_END) break;
         else if (match_kind(parser, SEMICOLON)) break;
         parser->token_index++;
     }
@@ -193,7 +188,7 @@ int expect_semicolon_or_recover(Parser* parser) {
 }
 
 /*--------- PARSING HELPERS ---------*/
-
+// Converts integer literal string to actual integer
 long get_int_lit_value(Parser* parser, Source* source_file) {
     // TODO: Maybe move into lexer?
     int index = parser->token_index;
@@ -217,17 +212,21 @@ long get_int_lit_value(Parser* parser, Source* source_file) {
 }
 
 /*--------- PARSE_{NODE} ---------*/
+// parses expression, moves pointer to end of expr.
 ASTNode* parse_expr(Parser* parser, Source* source_file) {
-    // TODO*: Move token_index to end of expression.
     ASTNode* expr = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
 
     if (current(parser).token_kind == INT_LITERAL) {
-        // TODO: Decide if this is AST_INT_LIT or AST_EXPR.
+        // todo: parse -(unary op)
         expr->ast_kind = AST_INT_LIT;
         expr->node_info.int_lit = (IntLitInfo) {
             .value = get_int_lit_value(parser, source_file)
         };
         advance(parser);
+    }
+    else { // error
+        expr->ast_kind = AST_ERROR;
+        add_err_msg(parser, "Could not parse expression.", current(parser).line, current(parser).col);
     }
     // TODO: Parse real expressions, not just integer literals.
 
@@ -236,7 +235,7 @@ ASTNode* parse_expr(Parser* parser, Source* source_file) {
 
 ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     /*  Parses:
-        int x;
+        int x; (not yet implemented)
         int x = {expr};
         Pointer assumed to be at 'INT'.
     */
@@ -244,7 +243,6 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     ASTNode* int_decl = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     int_decl->ast_kind = AST_VAR_DEC;
 
-    // TODO: Append err message to err message list in parser
     char* err_msg = arena_alloc(parser->ast_arena,
                             DEFAULT_ERR_MSG_SIZE,
                             alignof(char));
@@ -257,9 +255,9 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     }
     else {
         // Move pointer to next safe boundary
-        // TODO: Error check harder?
+        int_decl->ast_kind = AST_ERROR;
         add_err_msg(parser, err_msg, current(parser).line, current(parser).col);
-        expect_semicolon_or_recover(parser);
+        sync_to_boundary(parser);
         return int_decl;
     }
 
@@ -275,6 +273,7 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     }
     else {
         // TODO: Get specific identifier name and append to error list.
+        int_decl->ast_kind = AST_ERROR;
         add_err_msg(parser, "Error: expected '=' after IDENTIFIER", current(parser).line, current(parser).col);
         expect_semicolon_or_recover(parser);
         return int_decl;
@@ -284,6 +283,7 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
                             DEFAULT_ERR_MSG_SIZE,
                             alignof(char));
     if (!expect(parser, SEMICOLON, err_msg_2)) {
+        int_decl->ast_kind = AST_ERROR;
         add_err_msg(parser, err_msg_2, current(parser).line, current(parser).col);
     }
 
@@ -332,8 +332,6 @@ void add_err_msg(Parser* parser, char* err_msg, size_t line, size_t col) {
     }
 }
 
-// Adds 
-
 // True if errors were present.
 int print_parser_err_msgs(Parser* parser) {
     if (parser->error_list_size == 0) return 0;
@@ -344,9 +342,6 @@ int print_parser_err_msgs(Parser* parser) {
     return 1;
 }
 
-
-// TODO: Since THIS is allocating the arena, this should also probably free it later.
-// I think that makes the most sense.
 ASTNode* build_ast(Parser* parser, Source* source_file) {
 
     ASTNode* ast_root = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
@@ -378,10 +373,13 @@ ASTNode* build_ast(Parser* parser, Source* source_file) {
             }
         }
         else {
+            add_err_msg(parser, "Unexpected token.", current(parser).line, current(parser).col);
             //TODO* Remove this once more things r implemented.
-            // I want each 'parse_x' to advance the pointer.
+            // I want each 'parse_x' to advance the pointer to proper place
             parser->token_index++;
         }
+
+        // todo: Error checking after each built node
         /*I define parse_{node} for each node. */
         
     }
