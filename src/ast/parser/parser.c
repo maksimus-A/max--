@@ -226,6 +226,14 @@ ASTNode* parse_expr(Parser* parser, Source* source_file) {
         };
         advance(parser);
     }
+    else if (current(parser).token_kind == IDENTIFIER) {
+        // TODO: Check entirety of expression.
+        // For now we'll focus on single identifiers on RHS.
+        expr->ast_kind = AST_NAME;
+        expr->node_info.var_name.name_span = create_span_from(parser->tokens->data[parser->token_index].start, 
+            parser->tokens->data[parser->token_index].start + parser->tokens->data[parser->token_index].length);
+        advance(parser);
+    }
     else { // error
         expr->ast_kind = AST_ERROR;
         add_err_msg(parser, "Could not parse expression.", current(parser).line, current(parser).col);

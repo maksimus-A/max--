@@ -59,9 +59,9 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             // TODO: Check if is 'int x;' or 'int x = 0;'
             char* start_ptr = start_of_name(node->node_info.var_decl.name_span, source_file);
 
-            printf("VarDecl type={%s} name=", get_type_string(node->node_info.var_decl.type));
+            printf("VarDecl type={%s} name={", get_type_string(node->node_info.var_decl.type));
             print_file_slice(start_ptr, node->node_info.var_decl.name_span.length);
-            printf("\n");
+            printf("}\n");
 
             indent++;
             dump_ast(node->node_info.var_decl.init_expr, source_file, indent);
@@ -75,6 +75,15 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             IntLitInfo int_lit = node->node_info.int_lit;
             printf("IntLit %ld", int_lit.value);
             printf(")\n");
+            break;
+        }
+        case AST_NAME: // leaf
+        {
+            printf("VarName name={");
+
+            char* start_ptr = start_of_name(node->node_info.var_name.name_span, source_file);
+            print_file_slice(start_ptr, node->node_info.var_name.name_span.length);
+            printf("})\n");
             break;
         }
         case AST_BLOCK:
