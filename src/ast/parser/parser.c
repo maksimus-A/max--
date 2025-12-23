@@ -58,7 +58,7 @@ int expect(Parser* parser, enum TokenKind kind, char* err_msg) {
         line_col.col = current(parser).col;
 
         // Todo: Check which token was expected.
-        int res = snprintf(err_msg, DEFAULT_ERR_MSG_SIZE, "Error at (%zu:%zu): expected %s after %s", line_col.line, line_col.col, expected_token_str, curr_token_str);
+        int res = snprintf(err_msg, DEFAULT_ERR_MSG_SIZE, "Expected %s after %s", expected_token_str, curr_token_str);
         return 0;
     }
 }
@@ -258,7 +258,7 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     else {
         // Move pointer to next safe boundary
         // TODO: Error check harder?
-        add_err_msg(parser, err_msg);
+        add_err_msg(parser, err_msg, current(parser).line, current(parser).col);
         expect_semicolon_or_recover(parser);
         return int_decl;
     }
@@ -275,7 +275,7 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     }
     else {
         // TODO: Get specific identifier name and append to error list.
-        add_err_msg(parser, "Error: expected '=' after IDENTIFIER");
+        add_err_msg(parser, "Error: expected '=' after IDENTIFIER", current(parser).line, current(parser).col);
         expect_semicolon_or_recover(parser);
         return int_decl;
     }
@@ -284,7 +284,7 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
                             DEFAULT_ERR_MSG_SIZE,
                             alignof(char));
     if (!expect(parser, SEMICOLON, err_msg_2)) {
-        add_err_msg(parser, err_msg_2);
+        add_err_msg(parser, err_msg_2, current(parser).line, current(parser).col);
     }
 
     return int_decl;
@@ -320,13 +320,19 @@ void push_node(Parser* parser, ASTNode* ast_root, ASTNode* node) {
 
 /*------ ERROR MESSAGE HELPERS ------*/
 
-// Adds error message to error list during parsing.
-void add_err_msg(Parser* parser, char* err_msg) {
+// Adds error message with line/col to error list during parsing.
+void add_err_msg(Parser* parser, char* err_msg, size_t line, size_t col) {
+    char* new_err_msg = arena_alloc(parser->ast_arena,
+                            DEFAULT_ERR_MSG_SIZE,
+                            alignof(char));
+    snprintf(new_err_msg, DEFAULT_ERR_MSG_SIZE, "Error at (%zu:%zu): %s", line, col, err_msg);
     if (parser->error_list_size < DEFAULT_ERROR_LIST_SIZE) {
-        parser->error_list[parser->error_list_size] = err_msg;
+        parser->error_list[parser->error_list_size] = new_err_msg;
         parser->error_list_size++;
     }
 }
+
+// Adds 
 
 // True if errors were present.
 int print_parser_err_msgs(Parser* parser) {
@@ -363,7 +369,7 @@ ASTNode* build_ast(Parser* parser, Source* source_file) {
                         push_node(parser, ast_root, int_decl);
                     }
                     else {
-                        add_err_msg(parser, "Expected 'IDENTIFIER' after 'int'.");
+                        add_err_msg(parser, "Expected 'IDENTIFIER' after 'int'.", current(parser).line, current(parser).col);
                         expect_semicolon_or_recover(parser);
                     }
                     break;

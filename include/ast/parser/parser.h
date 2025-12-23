@@ -19,5 +19,5 @@ int initialize_parser(Parser* parser, Arena* arena, TokenBuffer* tokens);
 int free_ast_arena(Parser* parser);
 
 // Error helpers
-void add_err_msg(Parser* parser, char* err_msg);
+void add_err_msg(Parser* parser, char* err_msg, size_t line, size_t col);
 int print_parser_err_msgs(Parser* parser);
