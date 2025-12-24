@@ -32,11 +32,19 @@ bool symbol_in_scope(Scope* scope, SrcSpan span, Resolver* resolver) {
     return false;
 }
 
+Symbol* get_symbol(Scope* scope, SrcSpan span, Resolver* resolver) {
+    Symbol* symbol = scope->symbols;
+    while (symbol != NULL) {
+        if (symbols_eq(symbol->symbol_span, span, resolver->source_file)) return symbol;
+        symbol = symbol->next;
+    }
+    return NULL;
+}
+
 // Hook that runs before visiting a node/its children.
 // user = Resolver
 void resolver_pre(void* user, ASTNode* node) {
     Resolver* resolver = (Resolver*)user;
-    dump_scope_stack(resolver);
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
@@ -45,6 +53,7 @@ void resolver_pre(void* user, ASTNode* node) {
             scope->parent = NULL;
             scope->symbols = NULL;
             resolver->scope = scope;
+            if (resolver->debug) dump_scope_stack(resolver);
             break;
         }
         case AST_BLOCK:
@@ -54,29 +63,34 @@ void resolver_pre(void* user, ASTNode* node) {
             new_scope->parent = resolver->scope;
             new_scope->symbols = NULL;
             resolver->scope = new_scope;
+            if (resolver->debug) dump_scope_stack(resolver);
             break;
         }
         case AST_VAR_DEC: 
         {
-            // todo: declare symbol after ensuring it's not inside symbol table
-            // Declare name in current scope
-            Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
-            symbol->symbol_span = node->node_info.var_decl.name_span;
             // Check if name already exists in scope
-            if (symbol_in_scope(resolver->scope, symbol->symbol_span, resolver)) {
+            if (symbol_in_scope(resolver->scope, node->node_info.var_decl.name_span, resolver)) {
                 char* err_msg = alloc_error(resolver->diags);
-                const char* ptr = &resolver->source_file->buffer[symbol->symbol_span.start];
+                const char* ptr = &resolver->source_file->buffer[node->node_info.var_decl.name_span.start];
 
                 snprintf(err_msg, DEFAULT_ERR_MSG_SIZE,
                         "Symbol '%.*s' has been previously declared.",
-                        (int)symbol->symbol_span.length, ptr);
-                LineCol line_col = get_line_col_from_span(symbol->symbol_span.start, resolver->source_file);
-                add_diag(resolver->diags, ERROR, symbol->symbol_span, err_msg, line_col.line, line_col.col);
+                        (int)node->node_info.var_decl.name_span.length, ptr);
+                LineCol line_col = get_line_col_from_span(node->node_info.var_decl.name_span.start, resolver->source_file);
+                add_diag(resolver->diags, ERROR, node->node_info.var_decl.name_span, err_msg, line_col.line, line_col.col);
                 break;
             }
+            // Declare var in current scope
+            Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
+            symbol->symbol_span = node->node_info.var_decl.name_span;
+            symbol->type = node->node_info.var_decl.type;
+            // Add symbol to node
+            node->node_info.var_decl.symbol = symbol;
             // Push symbol into scope (insert at head)
             symbol->next = resolver->scope->symbols;
             resolver->scope->symbols = symbol;
+
+            if (resolver->debug) dump_scope_stack(resolver);
             break;
         }
         case AST_NAME:
@@ -92,7 +106,7 @@ void resolver_pre(void* user, ASTNode* node) {
                 }
                 scope = scope->parent;
             }
-            if (!found) {
+            if (!found) { // adds error to diags
                 char* err_msg = alloc_error(resolver->diags);
                 const char* ptr = &resolver->source_file->buffer[wanted.start];
 
@@ -103,6 +117,8 @@ void resolver_pre(void* user, ASTNode* node) {
                 add_diag(resolver->diags, ERROR, wanted, err_msg, line_col.line, line_col.col);
                 break;
             }
+            // Add symbol to AST_NAME (we verified it exists)
+            node->node_info.var_name.resolved_sym = get_symbol(scope, wanted, resolver);
             break;
         }
 
@@ -116,12 +132,14 @@ void resolver_post(void* user, ASTNode* node) {
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
+            if (resolver->debug) dump_scope_stack(resolver);
             // Pop scope
             resolver->scope = resolver->scope->parent;
             break;
         }
         case AST_BLOCK:
         {
+            if (resolver->debug) dump_scope_stack(resolver);
             // Pop scope
             resolver->scope = resolver->scope->parent;
             break;
@@ -165,7 +183,7 @@ void dump_scope_stack(Resolver* res) {
         Symbol* sym = scope->symbols;
         while (sym != NULL) {
             print_symbol(sym->symbol_span, res->source_file);
-            fprintf(stdout, ", ");
+            if (sym->next != NULL) fprintf(stdout, ", ");
             sym = sym->next;
         }
         fprintf(stdout, "}\n");

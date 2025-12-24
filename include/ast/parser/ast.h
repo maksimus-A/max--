@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 typedef struct ASTNode ASTNode;
+typedef struct Symbol Symbol;
 
 /*------ AST HELPERS ------*/
 typedef enum ASTKind {
@@ -28,7 +29,6 @@ typedef enum BuiltInType {
 
 typedef struct SrcSpan {
     // Used to store variable name + location.
-    // TODO: Make helper that computes line/col based on start/length.
     size_t length;
     size_t start;
 } SrcSpan;
@@ -58,11 +58,13 @@ typedef struct VarDeclInfo {
     SrcSpan name_span;
     enum BuiltInType type;
     ASTNode* init_expr; // = expr;
+    Symbol* symbol;
 } VarDeclInfo;
 
 // Variable name
 typedef struct VarNameInfo{
     SrcSpan name_span; // var name
+    Symbol* resolved_sym;
 } VarNameInfo;
 
 // Blocks
