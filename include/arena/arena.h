@@ -11,7 +11,7 @@ struct MemBlock {
     size_t capacity;
     size_t used;
     unsigned char data[];
-    /* Writing thsi comment for myself because this is new to me:
+    /* Writing this comment for myself because this is new to me:
     I use 'unsigned char' to tell the compiler it's just a big bag of bytes that I'm managing.
     char is the only type that allows aliasing to arbitrary object representations (and is 1 byte).
     The arena (should) return a void pointer, and I'll cast it to the type I need.

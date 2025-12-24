@@ -26,6 +26,9 @@ set(MAXC_SOURCES
     src/ast/lexer/lexer.c
     src/ast/parser/parser.c
     src/ast/parser/ast_printer.c
+    src/semantics/scope.c
+    src/semantics/walker.c
+    src/errors/diagnostics.c
     src/debug.c
     src/common.c
     src/arena/arena.c

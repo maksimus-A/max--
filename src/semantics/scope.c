@@ -5,8 +5,10 @@
 
 #include "arena/arena.h"
 #include "ast/parser/ast.h"
+#include "common.h"
 #include "semantics/scope.h"
 #include "semantics/walker.h"
+
 
 bool symbols_eq(SrcSpan a, SrcSpan b, Source* source_file) {
     if (a.length != b.length) return false;
@@ -30,7 +32,6 @@ bool symbol_in_scope(Scope* scope, SrcSpan span, Resolver* resolver) {
     return false;
 }
 
-// TODO: Implement
 // user = Resolver
 void resolver_pre(void* user, ASTNode* node) {
     Resolver* resolver = (Resolver*)user;
@@ -55,12 +56,20 @@ void resolver_pre(void* user, ASTNode* node) {
         }
         case AST_VAR_DEC: 
         {
+            // todo: declare symbol after ensuring it's not inside symbol table
             // Declare name in current scope
             Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
             symbol->symbol_span = node->node_info.var_decl.name_span;
             // Check if name already exists in scope
             if (symbol_in_scope(resolver->scope, symbol->symbol_span, resolver)) {
-                //todo: add to diags that symbol alr existed
+                char* err_msg = alloc_error(resolver->diags);
+                const char* ptr = &resolver->source_file->buffer[symbol->symbol_span.start];
+
+                snprintf(err_msg, DEFAULT_ERR_MSG_SIZE,
+                        "Symbol '%.*s' has been previously declared.",
+                        (int)symbol->symbol_span.length, ptr);
+                LineCol line_col = get_line_col_from_span(symbol->symbol_span.start, resolver->source_file);
+                add_diag(resolver->diags, ERROR, symbol->symbol_span, err_msg, line_col.line, line_col.col);
                 break;
             }
             // Push symbol into scope (insert at head)
@@ -82,7 +91,15 @@ void resolver_pre(void* user, ASTNode* node) {
                 scope = scope->parent;
             }
             if (!found) {
-                //todo: add to diags that symbol being used wasn't declared yet
+                char* err_msg = alloc_error(resolver->diags);
+                const char* ptr = &resolver->source_file->buffer[wanted.start];
+
+                snprintf(err_msg, DEFAULT_ERR_MSG_SIZE,
+                        "Symbol '%.*s' has not been declared.",
+                        (int)wanted.length, ptr);
+                LineCol line_col = get_line_col_from_span(wanted.start, resolver->source_file);
+                add_diag(resolver->diags, ERROR, wanted, err_msg, line_col.line, line_col.col);
+                break;
             }
             break;
         }
@@ -90,6 +107,7 @@ void resolver_pre(void* user, ASTNode* node) {
         default: break;
     }
 }
+
 void resolver_post(void* user, ASTNode* node) {
     Resolver* resolver = (Resolver*)user;
     switch (node->ast_kind) {

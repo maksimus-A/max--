@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdalign.h>
 #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
 #include "arena/arena_test.h"
@@ -86,6 +87,7 @@ int main(int argc, char **argv) {
     FILE *fp = fopen(args.input_path, "r");
     if (!fp) {
         fprintf(stderr, "Cannot open %s: %s\n", argv[1], strerror(errno));
+        return 1;
     }
     
     // Read file into buffer.
@@ -106,13 +108,14 @@ int main(int argc, char **argv) {
     }
 
     // Allocate big memory arena for persistent memory (until compilation finishes)
-    Arena arena;
+    Arena arena = {0};
     if (!arena_init(&arena, DEFAULT_BLOCK_SIZE)) {
         fprintf(stderr, "Failed to initialize arena in main.");
         return 2;
     }
-    Diagnostics* diags;
-    diags_init(diags, &arena, 16);
+    Diagnostics diags;
+    diags_init(&diags, &arena, 16);
+    assert(diags.items != NULL);
 
     
     // Lex the input buffer into tokens
@@ -165,8 +168,10 @@ int main(int argc, char **argv) {
     // Scope resolver
     Resolver resolver;
     // Resolver can reference arena via 'diags'
-    resolver_init(&resolver, &arena, diags, &source_file);
+    resolver_init(&resolver, &arena, &diags, &source_file);
     run_resolver(ast_root, &resolver);
+
+    if (print_errors(&diags)) return 4;
 
     
     // Free all memory

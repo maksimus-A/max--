@@ -1,5 +1,6 @@
 int x = 3;
-{ int x = 1; 
+int y = x;
+{ int y = x;
     { int x = 2;}
 }
-exit(0);
+exit(x);

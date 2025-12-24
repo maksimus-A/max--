@@ -1,5 +1,6 @@
 
 #include "ast/parser/ast.h"
+#include <stdbool.h>
 #include <stddef.h>
 
 #define DEFAULT_ERR_MSG_SIZE 100
@@ -26,3 +27,7 @@ Diagnostic* create_diag(Arena* arena, Severity sev, SrcSpan span, const char* er
 void push_error(Diagnostics* diags, Diagnostic* diag);
 void add_diag(Diagnostics* diags, Severity sev, SrcSpan span, char* err_msg, size_t line, size_t col);
 void diags_init(Diagnostics* diags, Arena* arena, size_t capacity);
+
+char* alloc_error(Diagnostics* diags);
+
+bool print_errors(Diagnostics* diags);
