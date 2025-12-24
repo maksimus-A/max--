@@ -7,10 +7,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include "arena/arena.h"
 #include "ast/lexer/lexer.h"
 #include "ast/parser/parser.h"
 #include "ast/parser/ast_printer.h"
-#include "arena/arena.h"
+#include "semantics/scope.h"
+#include "semantics/walker.h"
 #include "common.h"
 
 #include "debug.h"
@@ -61,6 +63,18 @@ Args parse_args(int argc, char **argv) {
 
 
 int main(int argc, char **argv) {
+
+    /*------------ DEBUGGING ARENA ------------ */
+    #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
+        Arena a = {0};
+        arena_init(&a, 256);
+
+        test_arena_all(&a);
+
+        arena_destroy(&a);
+    #endif
+    /*------------ DEBUGGING ARENA ------------ */
+
     // Parse input arguments
     Args args = parse_args(argc, argv);
     if (args.error_code != 0) {
@@ -90,6 +104,18 @@ int main(int argc, char **argv) {
         printf("\n\nBuffer size: %d\n", (int)source_file.length);
         printf("--------- LEXER ---------\n");
     }
+
+    // Allocate big memory arena for persistent memory (until compilation finishes)
+    Arena arena;
+    if (!arena_init(&arena, DEFAULT_BLOCK_SIZE)) {
+        fprintf(stderr, "Failed to initialize arena in main.");
+        return 2;
+    }
+    Diagnostics* diags;
+    diags->arena = &arena;
+    diags->count = 0;
+    diags->capacity = 16;
+    diags->items = (Diagnostic**)arena_alloc(&arena, sizeof(Diagnostic*) * diags->capacity, alignof(Diagnostic*));
     
     // Lex the input buffer into tokens
     // TODO: Check result of filling buffer for errors
@@ -116,13 +142,8 @@ int main(int argc, char **argv) {
     }
 
 
-
     // Create AST based on token buffer
-    Arena arena;
-    if (!arena_init(&arena, DEFAULT_BLOCK_SIZE)) {
-        fprintf(stderr, "Failed to initialize arena in main.");
-        return 2;
-    }
+
     Parser parser;
     if (!initialize_parser(&parser, &arena, &tokens)) {
         fprintf(stderr, "Failed to initialize parser.");
@@ -140,17 +161,15 @@ int main(int argc, char **argv) {
         printf("------------- AST -------------\n");
         dump_ast(ast_root, &source_file, 0);
     }
-    
-    /*------------ DEBUGGING ARENA ------------ */
-    #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
-        Arena a = {0};
-        arena_init(&a, 256);
 
-        test_arena_all(&a);
+    /*------ Semantic passes ------*/
 
-        arena_destroy(&a);
-    #endif
-    /*------------ DEBUGGING ARENA ------------ */
+    // Scope resolver
+    Visitor resolver_visitor;
+    Resolver resolver;
+    resolver.diags = diags;
+    walk_node(&resolver_visitor, &resolver, ast_root);
+
     
     // Free all memory
     free(tokens.data);

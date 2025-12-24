@@ -11,7 +11,7 @@ typedef enum ASTKind {
     AST_VAR_DEC,
     AST_INT_LIT,
     AST_NAME, // identifier expression
-    AST_EXPR,
+    AST_EXPR, // remove?
     AST_BLOCK,
     AST_EXIT,
     AST_ERROR

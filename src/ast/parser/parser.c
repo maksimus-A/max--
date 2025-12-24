@@ -6,11 +6,12 @@
 #include "ast/parser/parser.h"
 #include "ast/parser/ast.h"
 #include "arena/arena.h"
+#include "errors/diagnostics.h"
 #include "debug.h"
 #include "common.h"
 
 #define AST_DEFAULT_CAPACITY 32
-#define DEFAULT_ERR_MSG_SIZE 100
+
 
 void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond);
 char* alloc_error_ptr(Parser* parser);

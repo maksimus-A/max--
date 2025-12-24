@@ -13,7 +13,7 @@ char* get_type_string(BuiltInType type) {
     return built_in_type_string[type];
 }
 
-// Grabs actual string name from span in buffer.
+// Grabs actual string name (start pointer) from span in buffer.
 char* start_of_name(SrcSpan span, Source* source_file) {
     return &source_file->buffer[span.start];
 }
