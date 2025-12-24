@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
     // Scope resolver
     Resolver resolver;
     // Resolver can reference arena via 'diags'
-    resolver_init(&resolver, &arena, &diags, &source_file);
+    resolver_init(&resolver, &arena, &diags, &source_file, args.debug);
     run_resolver(ast_root, &resolver);
 
     if (print_errors(&diags)) return 4;

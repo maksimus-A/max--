@@ -32,9 +32,11 @@ bool symbol_in_scope(Scope* scope, SrcSpan span, Resolver* resolver) {
     return false;
 }
 
+// Hook that runs before visiting a node/its children.
 // user = Resolver
 void resolver_pre(void* user, ASTNode* node) {
     Resolver* resolver = (Resolver*)user;
+    dump_scope_stack(resolver);
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
@@ -108,6 +110,7 @@ void resolver_pre(void* user, ASTNode* node) {
     }
 }
 
+// Hook that runs after visiting a node.
 void resolver_post(void* user, ASTNode* node) {
     Resolver* resolver = (Resolver*)user;
     switch (node->ast_kind) {
@@ -137,9 +140,37 @@ void run_resolver(ASTNode* ast_root, Resolver* resolver) {
     walk_node(&resolver_visitor, resolver, ast_root);
 }
 
-void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source* source_file) {
+void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source* source_file, bool debug) {
     resolver->diags = diags;
     resolver->arena = arena;
     resolver->scope = NULL;
     resolver->source_file = source_file;
+    resolver->debug = debug;
+}
+
+// Prints symbol at specified span (start, length)
+void print_symbol(SrcSpan span, Source* source_file) {
+    const char* ptr = &source_file->buffer[span.start];
+    fprintf(stdout, "%.*s", (int)span.length, ptr);
+}
+
+void dump_scope_stack(Resolver* res) {
+    fprintf(stdout, "[scope dump] ");
+    Scope* scope = res->scope;
+    fprintf(stdout, "current=%p\n", scope);
+
+    int depth = 0;
+    while (scope != NULL) {
+        fprintf(stdout, "\tdepth %d scope=%p parent=%p: symbols: {", depth, scope, scope->parent);
+        Symbol* sym = scope->symbols;
+        while (sym != NULL) {
+            print_symbol(sym->symbol_span, res->source_file);
+            fprintf(stdout, ", ");
+            sym = sym->next;
+        }
+        fprintf(stdout, "}\n");
+        scope = scope->parent;
+        depth++;
+    }
+    fprintf(stdout, "-----------------\n");
 }

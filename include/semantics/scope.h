@@ -18,10 +18,13 @@ typedef struct Resolver {
     Diagnostics* diags;
     Arena* arena;
     Source* source_file;
+    bool debug;
 } Resolver;
 
 void run_resolver(ASTNode* ast_root, Resolver* resolver);
-void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source* source_file);
+void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source* source_file, bool debug);
+
+void dump_scope_stack(Resolver* res);
 
 
 /*
