@@ -4,7 +4,7 @@
 
 typedef struct Symbol { 
     SrcSpan symbol_span;
-    const char* name;
+    BuiltInType type;
     struct Symbol* next; 
 } Symbol;
 
@@ -16,10 +16,12 @@ typedef struct Scope  {
 typedef struct Resolver { 
     Scope* scope; 
     Diagnostics* diags;
+    Arena* arena;
+    Source* source_file;
 } Resolver;
 
 void run_resolver(ASTNode* ast_root, Resolver* resolver);
-void resolver_init(Resolver* resolver, Diagnostics* diags);
+void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source* source_file);
 
 
 /*

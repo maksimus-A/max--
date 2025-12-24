@@ -74,6 +74,8 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
     // All the children nodes, while the visitor takes care of
     // Actually implementing what happens during each node.
     // So.. I guess... Just recursively traverse the list? DFS?
+    if (node == NULL) return;
+    if (visitor->pre) visitor->pre(user, node);
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
@@ -123,4 +125,5 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
             break;
         }
     }
+    if (visitor->post) visitor->post(user, node);
 }
