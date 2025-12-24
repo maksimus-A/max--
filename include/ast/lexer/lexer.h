@@ -6,6 +6,7 @@
 // Tokens will be stored by their length, and pointer to
 // their place in the file being lexed.
 
+// Ensure when you modify this, you modify the string_array inside debug.h.
 enum TokenKind {
     // ---- Special tokens ----
     TOK_EOF,

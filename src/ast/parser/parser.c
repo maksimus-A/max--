@@ -13,6 +13,7 @@
 #define DEFAULT_ERR_MSG_SIZE 100
 
 void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond);
+char* alloc_error_ptr(Parser* parser);
 
 /*--------- HELPERS --------- */
 // Checkers
@@ -54,10 +55,10 @@ int expect(Parser* parser, enum TokenKind kind, char* err_msg) {
         enum TokenKind curr_token = parser->tokens->data[curr_index].token_kind;
         const char* curr_token_str = token_kind_str[curr_token];
         const char* expected_token_str = token_kind_str[kind];
-
+        /*
         LineCol line_col;
         line_col.line = current(parser).line;
-        line_col.col = current(parser).col;
+        line_col.col = current(parser).col;*/
 
         // Todo: Check which token was expected.
         int res = snprintf(err_msg, DEFAULT_ERR_MSG_SIZE, "Expected %s after %s", expected_token_str, curr_token_str);
@@ -156,6 +157,37 @@ int starts_stmt(Parser* parser) {
     }
 }
 
+// Compares name of IDENTIFIER to given string.
+int compare_identifier_name(Parser* parser, Source* source_file, char* compare_to, size_t length) {
+    if (current(parser).length != length) return 0;
+
+    
+    char* start_ptr = &source_file->buffer[current(parser).start];
+    if (memcmp(start_ptr, compare_to, length) == 0) {
+        return 1;
+    }
+    return 0;
+}
+
+int starts_builtin_func(Parser* parser, Source* source_file) {
+    if (!(current(parser).token_kind == IDENTIFIER)) return 0;
+    switch (current(parser).length) {
+        case 4:
+        {
+            if (compare_identifier_name(parser, source_file, "exit", 4)) {
+                if (next(parser).token_kind == PAREN_START) {
+                    return 1;
+                }
+            }
+            return 0;
+        }
+
+        default:
+            return 0;
+    }
+    return 0;
+}
+
 // Create a span struct for metadata storage
 SrcSpan create_span_from(int start_mark, int end_mark) {
     SrcSpan span;
@@ -215,6 +247,7 @@ long get_int_lit_value(Parser* parser, Source* source_file) {
 
 /*--------- PARSE_{NODE} ---------*/
 // parses expression, moves pointer to end of expr.
+// Assumes pointer is at start of expression.
 ASTNode* parse_expr(Parser* parser, Source* source_file) {
     ASTNode* expr = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
 
@@ -249,7 +282,7 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
         int x = {expr};
         Pointer assumed to be at 'INT'.
     */
-
+    // TODO: Get the span of this declaration.
     ASTNode* int_decl = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     int_decl->ast_kind = AST_VAR_DEC;
 
@@ -323,6 +356,39 @@ ASTNode* parse_block_node(Parser* parser, Source* source_file) {
     return block_node;
 }
 
+// Parses builtin function 'exit(<expr>)'.
+// Assumes we start on 'exit' token.
+ASTNode* parse_exit(Parser* parser, Source* source_file) {
+
+    ASTNode* exit_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+    exit_node->ast_kind = AST_EXIT;
+    // TODO: Get span of the entire function (usually up to ;)
+    // we already verified the next token is '('.
+    advance(parser);
+    char* err_msg = alloc_error_ptr(parser);
+    expect(parser, PAREN_START, err_msg);
+
+    ASTNode* expr = parse_expr(parser, source_file);
+    exit_node->node_info.exit_info.expr = expr;
+
+    // Pointer is after expression now
+    char* err_msg_2 = alloc_error_ptr(parser);
+    if (!expect(parser, PAREN_END, err_msg)) {
+        add_err_msg(parser, err_msg_2, current(parser).line, current(parser).col);
+        sync_to_boundary(parser);
+        return exit_node;
+    }
+    char* err_msg_3 = alloc_error_ptr(parser);
+    if (!expect(parser, SEMICOLON, err_msg_3)) {
+        add_err_msg(parser, err_msg_3, current(parser).line, current(parser).col);
+        sync_to_boundary(parser);
+    }
+
+    return exit_node;
+}
+
+
+
 /*------ ITEM HELPER ------ */
 void ensure_item_capacity(Parser* parser, NodeList* list) {
     if (list->capacity == list->count) {
@@ -376,6 +442,13 @@ int print_parser_err_msgs(Parser* parser) {
     return 1;
 }
 
+// Allocates memory for an error message (if we need it).
+char* alloc_error_ptr(Parser* parser) {
+    return arena_alloc(parser->ast_arena,
+                    DEFAULT_ERR_MSG_SIZE,
+                    alignof(char));
+}
+
 void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond) {
 
     while (current(parser).token_kind != stop_cond && current(parser).token_kind != TOK_EOF) {
@@ -394,6 +467,12 @@ void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum T
                     break;
                 default:
                     break;
+            }
+        }
+        else if (starts_builtin_func(parser, source_file)) {
+            if (compare_identifier_name(parser, source_file, "exit", 4)) {
+                ASTNode* builtin_exit = parse_exit(parser, source_file);
+                push_node(parser, list, builtin_exit);
             }
         }
         else if (current(parser).token_kind == CUR_BRACK_START) {

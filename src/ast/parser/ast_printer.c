@@ -98,6 +98,16 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             printf(")\n");
             break;
         }
+        case AST_EXIT:
+        {
+            printf("Exit\n");
+            indent++;
+            dump_ast(node->node_info.exit_info.expr, source_file, indent);
+            indent--;
+            print_indentation(indent);
+            printf(")\n");
+            
+        }
         default:
             break;
     }

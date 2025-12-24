@@ -13,6 +13,7 @@ typedef enum ASTKind {
     AST_NAME, // identifier expression
     AST_EXPR,
     AST_BLOCK,
+    AST_EXIT,
     AST_ERROR
 } ASTKind;
 
@@ -69,6 +70,13 @@ typedef struct BlockInfo {
     NodeList body;
 } BlockInfo;
 
+//Built-ins
+// Exit
+typedef struct ExitInfo {
+    SrcSpan func_span;
+    ASTNode* expr;
+} ExitInfo;
+
 // Expressions?
 
 /*------- AST STRUCTS -------*/
@@ -83,6 +91,7 @@ typedef struct ASTNode {
         VarDeclInfo var_decl;
         VarNameInfo var_name;
         BlockInfo block_info;
+        ExitInfo exit_info;
     } node_info;
 } ASTNode;
 
