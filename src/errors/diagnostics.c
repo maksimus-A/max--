@@ -1,5 +1,6 @@
 #include "errors/diagnostics.h"
 #include <stdalign.h>
+#include <stdbool.h>
 #include <string.h>
 
 
@@ -54,4 +55,11 @@ void add_diag(Diagnostics* diags, Severity sev, SrcSpan span, char* err_msg, siz
     if (!diag) return;
 
     push_error(diags, diag);
+}
+
+void diags_init(Diagnostics* diags, Arena* arena, size_t capacity) {
+    diags->arena = arena;
+    diags->count = 0;
+    diags->capacity = capacity;
+    diags->items = (Diagnostic**)arena_alloc(arena, sizeof(Diagnostic*) * diags->capacity, alignof(Diagnostic*));
 }

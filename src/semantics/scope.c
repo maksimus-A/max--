@@ -1,13 +1,24 @@
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
 #include "semantics/scope.h"
+#include "semantics/walker.h"
 
-/*
-enter_block before visiting statements inside
-leave_block after visiting statements inside
-on_int_decl when you hit the decl node (usually before its initializer is walked, depending on your language rule)
-on_ident when you hit a AST_NAME
-on_exit when you hit AST_EXIT (typically before walking its expression is fine)
-*/
+// TODO: Implement
+void resolver_pre(void* user, ASTNode* node);
+void resolver_post(void* user, ASTNode* node);
 
+Visitor resolver_visitor = {
+    .pre = resolver_pre,
+    .post = resolver_post
+};
+
+void run_resolver(ASTNode* ast_root, Resolver* resolver) {
+    walk_node(&resolver_visitor, resolver, ast_root);
+}
+
+void resolver_init(Resolver* resolver, Diagnostics* diags) {
+    resolver->diags = diags;
+    resolver->scope = NULL;
+}

@@ -25,3 +25,4 @@ Diagnostic* create_diag(Arena* arena, Severity sev, SrcSpan span, const char* er
 
 void push_error(Diagnostics* diags, Diagnostic* diag);
 void add_diag(Diagnostics* diags, Severity sev, SrcSpan span, char* err_msg, size_t line, size_t col);
+void diags_init(Diagnostics* diags, Arena* arena, size_t capacity);

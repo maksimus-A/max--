@@ -112,10 +112,8 @@ int main(int argc, char **argv) {
         return 2;
     }
     Diagnostics* diags;
-    diags->arena = &arena;
-    diags->count = 0;
-    diags->capacity = 16;
-    diags->items = (Diagnostic**)arena_alloc(&arena, sizeof(Diagnostic*) * diags->capacity, alignof(Diagnostic*));
+    diags_init(diags, &arena, 16);
+
     
     // Lex the input buffer into tokens
     // TODO: Check result of filling buffer for errors
@@ -165,10 +163,10 @@ int main(int argc, char **argv) {
     /*------ Semantic passes ------*/
 
     // Scope resolver
-    Visitor resolver_visitor;
     Resolver resolver;
-    resolver.diags = diags;
-    walk_node(&resolver_visitor, &resolver, ast_root);
+    // Resolver can reference arena via 'diags'
+    resolver_init(&resolver, diags);
+    run_resolver(ast_root, &resolver);
 
     
     // Free all memory

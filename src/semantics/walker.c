@@ -61,6 +61,7 @@ bool span_eq(Source* source_file, SrcSpan a, SrcSpan b) {
     return (memcmp(a_ptr, b_ptr, a.length) == 0);
 }
 
+// IDK
 void span_to_cstr(Arena* arena, Source* source_file, SrcSpan span) {
 
 }

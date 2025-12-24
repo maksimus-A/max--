@@ -18,11 +18,9 @@ typedef struct Resolver {
     Diagnostics* diags;
 } Resolver;
 
-// todo: consider moving to 'walker.h'
-typedef struct Visitor {
-    void (*pre)(void* user, ASTNode* node);
-    void (*post)(void* user, ASTNode* node);
-} Visitor;
+void run_resolver(ASTNode* ast_root, Resolver* resolver);
+void resolver_init(Resolver* resolver, Diagnostics* diags);
+
 
 /*
   void (*enter_block)(void* user, ASTNode* block);
