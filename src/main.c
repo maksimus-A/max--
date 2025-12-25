@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
     // Create AST based on token buffer
 
     Parser parser;
-    if (!initialize_parser(&parser, &arena, &tokens)) {
+    if (!initialize_parser(&parser, &arena, &tokens, &diags)) {
         fprintf(stderr, "Failed to initialize parser.");
         return 2;
     }

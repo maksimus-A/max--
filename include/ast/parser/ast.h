@@ -12,7 +12,7 @@ typedef enum ASTKind {
     AST_VAR_DEC,
     AST_INT_LIT,
     AST_NAME, // identifier expression
-    AST_EXPR, // remove?
+    AST_ASSN,
     AST_BLOCK,
     AST_EXIT,
     AST_ERROR
@@ -67,6 +67,14 @@ typedef struct VarNameInfo{
     Symbol* resolved_sym;
 } VarNameInfo;
 
+// Assignment statement
+typedef struct AssnStmtInfo {
+    SrcSpan name_span;
+    enum BuiltInType type;
+    Symbol* resolved_sym;
+    ASTNode* init_expr;
+} AssnStmtInfo;
+
 // Blocks
 typedef struct BlockInfo {
     NodeList body;
@@ -94,6 +102,7 @@ typedef struct ASTNode {
         VarNameInfo var_name;
         BlockInfo block_info;
         ExitInfo exit_info;
+        AssnStmtInfo assn_stmt;
     } node_info;
 } ASTNode;
 

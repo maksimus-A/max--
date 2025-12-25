@@ -149,8 +149,8 @@ int starts_stmt(Parser* parser) {
         case RETURN:
             return 1;
             break;
-        case CUR_BRACK_START: // block start
-            return 1;
+        case IDENTIFIER: // assignment statement
+            if (next(parser).token_kind == EQ) return 1;
             break;
         default:
             return 0;
@@ -388,7 +388,43 @@ ASTNode* parse_exit(Parser* parser, Source* source_file) {
     return exit_node;
 }
 
+// Parse assignment statement (x = 2;)
+ASTNode* parse_assn(Parser* parser, Source* source_file) {
+    // TODO: Get the span of this assn.
+    ASTNode* assn_stmt = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+    assn_stmt->ast_kind = AST_ASSN;
+    SrcSpan name_span;
+    name_span = create_span_from(parser->tokens->data[parser->token_index].start, 
+            parser->tokens->data[parser->token_index].start + parser->tokens->data[parser->token_index].length);
 
+    char* err_msg = alloc_error(parser->diags);
+    advance(parser);
+
+    // ptr at expr
+    if (expect(parser, EQ, err_msg)) {
+        ASTNode* expr_node = parse_expr(parser, source_file);
+        // todo: check name span is correct
+        assn_stmt->node_info.assn_stmt = (struct AssnStmtInfo){
+            .name_span = name_span,
+            .type = TYPE_INT,
+            .init_expr = expr_node
+        };
+    }
+    else {
+        // todo: check name_span is correct.
+        assn_stmt->ast_kind = AST_ERROR;
+        add_diag(parser->diags, ERROR, name_span, err_msg, current(parser).line, current(parser).col);
+        sync_to_boundary(parser);
+        return assn_stmt;
+    }
+    
+    char* err_msg_2 = alloc_error(parser->diags);
+    if (!expect(parser, SEMICOLON, err_msg_2)) {
+        assn_stmt->ast_kind = AST_ERROR;
+        add_diag(parser->diags, ERROR, name_span, err_msg, current(parser).line, current(parser).col);
+    }
+    return assn_stmt;
+}
 
 /*------ ITEM HELPER ------ */
 void ensure_item_capacity(Parser* parser, NodeList* list) {
@@ -419,7 +455,7 @@ void push_node(Parser* parser, NodeList* list, ASTNode* node) {
 }
 
 /*------ ERROR MESSAGE HELPERS ------*/
-
+// todo: replace all of these with Diagnostics struct
 // Adds error message with line/col to error list during parsing.
 void add_err_msg(Parser* parser, char* err_msg, size_t line, size_t col) {
     char* new_err_msg = arena_alloc(parser->ast_arena,
@@ -470,6 +506,26 @@ void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum T
                     break;
             }
         }
+        else if (starts_stmt(parser)) {
+            switch (current(parser).token_kind) {
+                case IDENTIFIER:
+                {
+                    if (next(parser).token_kind == EQ) {
+                        if (peek_n(parser, 2).token_kind == EQ) {
+                            // todo: later consider conditionals, '=='
+                        }
+                        else {
+                            ASTNode* assn = parse_assn(parser, source_file);
+                            push_node(parser, list, assn);
+                        }
+                    }
+                    break;
+                }
+
+                default: break;
+            }
+
+        }
         else if (starts_builtin_func(parser, source_file)) {
             if (compare_identifier_name(parser, source_file, "exit", 4)) {
                 ASTNode* builtin_exit = parse_exit(parser, source_file);
@@ -510,10 +566,11 @@ ASTNode* build_ast(Parser* parser, Source* source_file) {
 }
 
 
-int initialize_parser(Parser* parser, Arena* arena, TokenBuffer* tokens) {
+int initialize_parser(Parser* parser, Arena* arena, TokenBuffer* tokens, Diagnostics* diags) {
     parser->ast_arena = arena;
     parser->token_index = 0;
     parser->tokens = tokens;
+    parser->diags = diags;
     parser->error_list_size = 0;
     return 1;
 }

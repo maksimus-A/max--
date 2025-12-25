@@ -1,6 +1,4 @@
-int x = 3;
-int y = x;
-{ int y = x;
-    { int x = 2;}
-}
+int x = 1;
+int y = 2;
+{int x = y;}
 exit(x);

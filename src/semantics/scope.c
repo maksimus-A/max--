@@ -44,6 +44,7 @@ Symbol* get_symbol(Scope* scope, SrcSpan span, Resolver* resolver) {
 // Hook that runs before visiting a node/its children.
 // user = Resolver
 void resolver_pre(void* user, ASTNode* node) {
+    // todo: add 'WARN' if we see 'int x = x;'
     Resolver* resolver = (Resolver*)user;
     switch (node->ast_kind) {
         case AST_PROGRAM:
@@ -154,6 +155,7 @@ Visitor resolver_visitor = {
     .post = resolver_post
 };
 
+// Main function called to resolve scope and symbols.
 void run_resolver(ASTNode* ast_root, Resolver* resolver) {
     walk_node(&resolver_visitor, resolver, ast_root);
 }
@@ -172,6 +174,7 @@ void print_symbol(SrcSpan span, Source* source_file) {
     fprintf(stdout, "%.*s", (int)span.length, ptr);
 }
 
+// Prints current scope (and any parent scopes)
 void dump_scope_stack(Resolver* res) {
     fprintf(stdout, "[scope dump] ");
     Scope* scope = res->scope;

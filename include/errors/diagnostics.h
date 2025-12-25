@@ -1,3 +1,4 @@
+#pragma once
 
 #include "ast/parser/ast.h"
 #include <stdbool.h>

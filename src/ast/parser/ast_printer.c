@@ -98,6 +98,21 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             printf(")\n");
             break;
         }
+        case AST_ASSN:
+        {
+            char* start_ptr = start_of_name(node->node_info.assn_stmt.name_span, source_file);
+
+            printf("AssnStmt type={%s} name={", get_type_string(node->node_info.assn_stmt.type));
+            print_file_slice(start_ptr, node->node_info.assn_stmt.name_span.length);
+            printf("}\n");
+
+            indent++;
+            dump_ast(node->node_info.assn_stmt.init_expr, source_file, indent);
+            indent--;
+            print_indentation(indent);
+            printf(")\n");
+            break;
+        }
         case AST_EXIT:
         {
             printf("Exit\n");
