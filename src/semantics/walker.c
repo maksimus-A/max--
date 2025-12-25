@@ -29,6 +29,7 @@ NodeList* get_item_list(ASTNode* node) {
 ASTNode* get_child_expr(ASTNode* node) {
     switch (node->ast_kind) {
         case AST_VAR_DEC: return node->node_info.var_decl.init_expr;
+        case AST_ASSN: return node->node_info.assn_stmt.init_expr;
         case AST_EXIT: return node->node_info.exit_info.expr;
         default: return NULL;
     }
@@ -66,7 +67,6 @@ void span_to_cstr(Arena* arena, Source* source_file, SrcSpan span) {
 
 }
 
-
 /*------ WALKERS -------*/
 // void* means current user (resolver, type_checker, etc)
 void walk_node(Visitor* visitor, void* user, ASTNode* node) {
@@ -92,6 +92,11 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
             ASTNode* expr = get_child_expr(node);
             if (expr) walk_node(visitor, user, expr);
             break;
+        }
+        case AST_ASSN:
+        {
+            ASTNode* expr = get_child_expr(node);
+            if (expr) walk_node(visitor, user, expr);
         }
         case AST_EXIT:
         {

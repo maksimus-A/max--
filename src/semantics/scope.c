@@ -32,6 +32,7 @@ bool symbol_in_scope(Scope* scope, SrcSpan span, Resolver* resolver) {
     return false;
 }
 
+// Returns symbol (if it exists inside scope)
 Symbol* get_symbol(Scope* scope, SrcSpan span, Resolver* resolver) {
     Symbol* symbol = scope->symbols;
     while (symbol != NULL) {
@@ -90,6 +91,40 @@ void resolver_pre(void* user, ASTNode* node) {
             // Push symbol into scope (insert at head)
             symbol->next = resolver->scope->symbols;
             resolver->scope->symbols = symbol;
+
+            if (resolver->debug) dump_scope_stack(resolver);
+            break;
+        }
+        case AST_ASSN:
+        {
+            // Check for name up scope chain
+            Scope* scope = resolver->scope;
+            SrcSpan wanted = node->node_info.assn_stmt.name_span;
+            Symbol* name_symbol = NULL;
+            while (scope != NULL) {
+                name_symbol = get_symbol(scope, wanted, resolver);
+                if (name_symbol != NULL) {
+                    break;
+                }
+                scope = scope->parent;
+            }
+
+            if (name_symbol == NULL) {
+                char* err_msg = alloc_error(resolver->diags);
+                const char* ptr = &resolver->source_file->buffer[node->node_info.assn_stmt.name_span.start];
+
+                snprintf(err_msg, DEFAULT_ERR_MSG_SIZE,
+                        "Symbol '%.*s' has not been declared.",
+                        (int)node->node_info.assn_stmt.name_span.length, ptr);
+                LineCol line_col = get_line_col_from_span(node->node_info.assn_stmt.name_span.start, resolver->source_file);
+                add_diag(resolver->diags, ERROR, node->node_info.assn_stmt.name_span, err_msg, line_col.line, line_col.col);
+                break;
+            }
+            else {
+                // todo: add symbol ptr to AST_ASSN
+                // Add symbol to node
+                node->node_info.assn_stmt.resolved_sym = name_symbol;
+            }
 
             if (resolver->debug) dump_scope_stack(resolver);
             break;
