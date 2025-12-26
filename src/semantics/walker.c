@@ -28,7 +28,12 @@ NodeList* get_item_list(ASTNode* node) {
 // Gets child expression from nodes that contain children expression nodes.
 ASTNode* get_child_expr(ASTNode* node) {
     switch (node->ast_kind) {
-        case AST_VAR_DEC: return node->node_info.var_decl.init_expr;
+        case AST_VAR_DEC: 
+        {
+            if (node->node_info.var_decl.init_expr != NULL)
+                return node->node_info.var_decl.init_expr;
+            return NULL;
+        }
         case AST_ASSN: return node->node_info.assn_stmt.init_expr;
         case AST_EXIT: return node->node_info.exit_info.expr;
         default: return NULL;
@@ -97,6 +102,7 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
         {
             ASTNode* expr = get_child_expr(node);
             if (expr) walk_node(visitor, user, expr);
+            break;
         }
         case AST_EXIT:
         {

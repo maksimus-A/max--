@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -9,6 +10,7 @@
 #include "semantics/scope.h"
 #include "semantics/walker.h"
 
+// todo: modify to accommodate 'int x;'
 
 bool symbols_eq(SrcSpan a, SrcSpan b, Source* source_file) {
     if (a.length != b.length) return false;
@@ -101,6 +103,7 @@ void resolver_pre(void* user, ASTNode* node) {
             Scope* scope = resolver->scope;
             SrcSpan wanted = node->node_info.assn_stmt.name_span;
             Symbol* name_symbol = NULL;
+
             while (scope != NULL) {
                 name_symbol = get_symbol(scope, wanted, resolver);
                 if (name_symbol != NULL) {

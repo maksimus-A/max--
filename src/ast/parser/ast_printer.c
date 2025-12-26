@@ -61,13 +61,17 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
 
             printf("VarDecl type={%s} name={", get_type_string(node->node_info.var_decl.type));
             print_file_slice(start_ptr, node->node_info.var_decl.name_span.length);
-            printf("}\n");
-
-            indent++;
-            dump_ast(node->node_info.var_decl.init_expr, source_file, indent);
-            indent--;
-            print_indentation(indent);
+            printf("}");
+            
+            if (node->node_info.var_decl.init_expr != NULL) {
+                printf("\n");
+                indent++;
+                dump_ast(node->node_info.var_decl.init_expr, source_file, indent);
+                indent--;
+                print_indentation(indent);
+            }
             printf(")\n");
+
             break;
         }
         case AST_INT_LIT: // leaf

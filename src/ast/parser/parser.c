@@ -287,9 +287,7 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     ASTNode* int_decl = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     int_decl->ast_kind = AST_VAR_DEC;
 
-    char* err_msg = arena_alloc(parser->ast_arena,
-                            DEFAULT_ERR_MSG_SIZE,
-                            alignof(char));
+    char* err_msg = alloc_error(parser->diags);
     // Find identifier, store its span
     advance(parser);
     SrcSpan name_span;
@@ -304,24 +302,29 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
         sync_to_boundary(parser);
         return int_decl;
     }
-
+    ASTNode* expr_node;
     // Check type of declaration (assignment or pure decl)
     if (match_kind(parser, EQ)) {
-        ASTNode* expr_node = parse_expr(parser, source_file);
-
-        int_decl->node_info.var_decl = (struct VarDeclInfo){
-            .name_span = name_span,
-            .type = TYPE_INT,
-            .init_expr = expr_node
-        };
+        expr_node = parse_expr(parser, source_file);
+    }
+    else if (current(parser).token_kind == SEMICOLON) {
+        // i'll check if this is null to see if it was a
+        // pure decl or expr decl.
+        expr_node = NULL;
     }
     else {
         // TODO: Get specific identifier name and append to error list.
         int_decl->ast_kind = AST_ERROR;
-        add_err_msg(parser, "Error: expected '=' after IDENTIFIER", current(parser).line, current(parser).col);
+        add_err_msg(parser, "Error: expected '=' or ';' after IDENTIFIER", current(parser).line, current(parser).col);
         expect_semicolon_or_recover(parser);
         return int_decl;
     }
+
+    int_decl->node_info.var_decl = (struct VarDeclInfo){
+        .name_span = name_span,
+        .type = TYPE_INT,
+        .init_expr = expr_node
+    };
     
     char* err_msg_2 = arena_alloc(parser->ast_arena,
                             DEFAULT_ERR_MSG_SIZE,
