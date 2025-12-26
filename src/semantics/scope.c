@@ -7,6 +7,7 @@
 #include "arena/arena.h"
 #include "ast/parser/ast.h"
 #include "common.h"
+#include "errors/diagnostics.h"
 #include "semantics/scope.h"
 #include "semantics/walker.h"
 
@@ -88,6 +89,7 @@ void resolver_pre(void* user, ASTNode* node) {
             Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
             symbol->symbol_span = node->node_info.var_decl.name_span;
             symbol->type = node->node_info.var_decl.type;
+            symbol->is_var = true;
             // Add symbol to node
             node->node_info.var_decl.symbol = symbol;
             // Push symbol into scope (insert at head)
@@ -113,19 +115,21 @@ void resolver_pre(void* user, ASTNode* node) {
             }
 
             if (name_symbol == NULL) {
-                char* err_msg = alloc_error(resolver->diags);
+
+
+                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.assn_stmt.name_span,
+                    "Symbol '%.*s' has not been declared.", resolver->source_file);
+                break;
+            }
+            if (!name_symbol->is_var){
                 const char* ptr = &resolver->source_file->buffer[node->node_info.assn_stmt.name_span.start];
 
-                snprintf(err_msg, DEFAULT_ERR_MSG_SIZE,
-                        "Symbol '%.*s' has not been declared.",
-                        (int)node->node_info.assn_stmt.name_span.length, ptr);
-                LineCol line_col = get_line_col_from_span(node->node_info.assn_stmt.name_span.start, resolver->source_file);
-                add_diag(resolver->diags, ERROR, node->node_info.assn_stmt.name_span, err_msg, line_col.line, line_col.col);
+                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.assn_stmt.name_span, 
+                    "Symbol '%.*s' is not an assignable variable.", resolver->source_file);
                 break;
             }
             else {
-                // todo: add symbol ptr to AST_ASSN
-                // Add symbol to node
+                 // Add symbol to node
                 node->node_info.assn_stmt.resolved_sym = name_symbol;
             }
 

@@ -156,6 +156,7 @@ int starts_stmt(Parser* parser) {
             return 0;
             break;
     }
+    return 0;
 }
 
 // Compares name of IDENTIFIER to given string.

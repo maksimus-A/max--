@@ -5,7 +5,8 @@
 typedef struct Symbol { 
     SrcSpan symbol_span;
     BuiltInType type;
-    struct Symbol* next; 
+    bool is_var;
+    struct Symbol* next;
 } Symbol;
 
 typedef struct Scope  { 

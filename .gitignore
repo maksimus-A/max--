@@ -7,3 +7,5 @@ bin/
 .cache/
 
 .VSCodeCounter/
+
+entire-workspace.txt

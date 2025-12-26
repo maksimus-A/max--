@@ -26,7 +26,10 @@ typedef struct Diagnostics {
 Diagnostic* create_diag(Arena* arena, Severity sev, SrcSpan span, const char* err_msg);
 
 void push_error(Diagnostics* diags, Diagnostic* diag);
+
+// two main funcs (gonna try to only use create_and_add...)
 void add_diag(Diagnostics* diags, Severity sev, SrcSpan span, char* err_msg, size_t line, size_t col);
+void create_and_add_diag_fmt(Diagnostics* diags, Severity sev, SrcSpan span, const char* fmt, Source* source_file);
 void diags_init(Diagnostics* diags, Arena* arena, size_t capacity);
 
 char* alloc_error(Diagnostics* diags);

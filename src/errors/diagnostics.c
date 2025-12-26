@@ -1,4 +1,5 @@
 #include "errors/diagnostics.h"
+#include <assert.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <string.h>
@@ -67,11 +68,29 @@ void add_diag(Diagnostics* diags, Severity sev, SrcSpan span, char* err_msg, siz
     push_error(diags, diag);
 }
 
+// Allocates err_msg, finds start ptr, constructs error message, and adds to diagnostics.
+// For 'formatted' strings to add the symbol pointer.
+void create_and_add_diag_fmt(Diagnostics* diags, Severity sev, SrcSpan span, const char* fmt, Source* source_file) {
+    assert(span.start <= source_file->length);
+    assert(span.start + span.length <= source_file->length);
+
+    char* err_msg = alloc_error(diags);
+    const char* sym_ptr = &source_file->buffer[span.start];
+
+    snprintf(err_msg, DEFAULT_ERR_MSG_SIZE,
+            fmt,
+            (int)span.length, sym_ptr);
+    LineCol line_col = get_line_col_from_span(span.start, source_file);
+    add_diag(diags, sev, span, err_msg, line_col.line, line_col.col);
+}
+
 bool print_errors(Diagnostics* diags) {
     if (diags->count == 0) return false;
     for (int i = 0; i < diags->count; i++) {
         char* severity = diags->items[i]->severity == ERROR ? "ERROR:" : "WARN";
         fprintf(stderr, "%s %s\n", severity, diags->items[i]->err_msg);
     }
+    printf("Compilation failed with %zu errors.", diags->count);
+    return true;
 }
 
