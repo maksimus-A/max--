@@ -13,6 +13,7 @@ struct Parser {
     int token_index;
     Arena* ast_arena;
     Diagnostics* diags;
+    size_t curr_id;
     // TODO: Remove once Diag refactor
     // is complete.
     char* error_list[DEFAULT_ERROR_LIST_SIZE];

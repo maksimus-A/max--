@@ -44,7 +44,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
-            printf("Program\n");
+            printf("Program id={%d}\n", (int)node->id);
             indent++;
             for (size_t i = 0; i < node->node_info.program.body.count; i++) {
                 dump_ast(node->node_info.program.body.items[i], source_file, indent);
@@ -59,7 +59,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             // TODO: Check if is 'int x;' or 'int x = 0;'
             char* start_ptr = start_of_name(node->node_info.var_decl.name_span, source_file);
 
-            printf("VarDecl type={%s} name={", get_type_string(node->node_info.var_decl.type));
+            printf("VarDecl id={%d} type={%s} name={", (int)node->id, get_type_string(node->node_info.var_decl.type));
             print_file_slice(start_ptr, node->node_info.var_decl.name_span.length);
             printf("}");
             
@@ -77,13 +77,13 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         case AST_INT_LIT: // leaf
         {
             IntLitInfo int_lit = node->node_info.int_lit;
-            printf("IntLit %ld", int_lit.value);
+            printf("IntLit id={%d} %ld", (int)node->id, int_lit.value);
             printf(")\n");
             break;
         }
         case AST_NAME: // leaf
         {
-            printf("VarName name={");
+            printf("VarName id={%d} name={", (int)node->id);
 
             char* start_ptr = start_of_name(node->node_info.var_name.name_span, source_file);
             print_file_slice(start_ptr, node->node_info.var_name.name_span.length);
@@ -92,7 +92,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         }
         case AST_BLOCK:
         {
-            printf("Block\n");
+            printf("Block id={%d}\n", (int)node->id);
             indent++;
             for (size_t i = 0; i < node->node_info.block_info.body.count; i++) {
                 dump_ast(node->node_info.block_info.body.items[i], source_file, indent);
@@ -106,7 +106,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         {
             char* start_ptr = start_of_name(node->node_info.assn_stmt.name_span, source_file);
 
-            printf("AssnStmt type={%s} name={", get_type_string(node->node_info.assn_stmt.type));
+            printf("AssnStmt id={%d} type={%s} name={", (int)node->id, get_type_string(node->node_info.assn_stmt.type));
             print_file_slice(start_ptr, node->node_info.assn_stmt.name_span.length);
             printf("}\n");
 
@@ -119,7 +119,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         }
         case AST_EXIT:
         {
-            printf("Exit\n");
+            printf("Exit id={%d}\n", (int)node->id);
             indent++;
             dump_ast(node->node_info.exit_info.expr, source_file, indent);
             indent--;

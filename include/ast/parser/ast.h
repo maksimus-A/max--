@@ -94,6 +94,7 @@ typedef struct ASTNode {
 
     ASTKind ast_kind;
     SrcSpan span; // location info of entire 'node'
+    size_t id;
 
     union {
         ProgramInfo program;

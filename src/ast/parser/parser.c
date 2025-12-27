@@ -12,7 +12,7 @@
 
 #define AST_DEFAULT_CAPACITY 32
 
-
+// todo: refactor all errors to just use 'Diagnostics'
 void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond);
 char* alloc_error_ptr(Parser* parser);
 
@@ -256,6 +256,8 @@ ASTNode* parse_expr(Parser* parser, Source* source_file) {
     if (current(parser).token_kind == INT_LITERAL) {
         // todo: parse -(unary op)
         expr->ast_kind = AST_INT_LIT;
+        expr->id = parser->curr_id;
+        parser->curr_id++;
         expr->node_info.int_lit = (IntLitInfo) {
             .value = get_int_lit_value(parser, source_file)
         };
@@ -265,6 +267,8 @@ ASTNode* parse_expr(Parser* parser, Source* source_file) {
         // TODO: Check entirety of expression.
         // For now we'll focus on single identifiers on RHS.
         expr->ast_kind = AST_NAME;
+        expr->id = parser->curr_id;
+        parser->curr_id++;
         expr->node_info.var_name.name_span = create_span_from(parser->tokens->data[parser->token_index].start, 
             parser->tokens->data[parser->token_index].start + parser->tokens->data[parser->token_index].length);
         advance(parser);
@@ -287,6 +291,8 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     // TODO: Get the span of this declaration.
     ASTNode* int_decl = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     int_decl->ast_kind = AST_VAR_DEC;
+    int_decl->id = parser->curr_id;
+    parser->curr_id++;
 
     char* err_msg = alloc_error(parser->diags);
     // Find identifier, store its span
@@ -342,6 +348,8 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
 ASTNode* parse_block_node(Parser* parser, Source* source_file) {
     ASTNode* block_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     block_node->ast_kind = AST_BLOCK;
+    block_node->id = parser->curr_id;
+    parser->curr_id++;
 
     block_node->node_info.block_info.body = (NodeList) {
         .items = (ASTNode**)arena_alloc(parser->ast_arena, AST_DEFAULT_CAPACITY * sizeof(ASTNode*), alignof(ASTNode*)),
@@ -367,6 +375,8 @@ ASTNode* parse_exit(Parser* parser, Source* source_file) {
 
     ASTNode* exit_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     exit_node->ast_kind = AST_EXIT;
+    exit_node->id = parser->curr_id;
+    parser->curr_id++;
     // TODO: Get span of the entire function (usually up to ;)
     // we already verified the next token is '('.
     advance(parser);
@@ -397,6 +407,9 @@ ASTNode* parse_assn(Parser* parser, Source* source_file) {
     // TODO: Get the span of this assn.
     ASTNode* assn_stmt = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     assn_stmt->ast_kind = AST_ASSN;
+    assn_stmt->id = parser->curr_id;
+    parser->curr_id++;
+
     SrcSpan name_span;
     name_span = create_span_from(parser->tokens->data[parser->token_index].start, 
             parser->tokens->data[parser->token_index].start + parser->tokens->data[parser->token_index].length);
@@ -559,6 +572,8 @@ ASTNode* build_ast(Parser* parser, Source* source_file) {
 
     ast_root->ast_kind = AST_PROGRAM;
     ast_root->span = create_span_from(parser->token_index, parser->tokens->count-1);
+    ast_root->id = parser->curr_id;
+    parser->curr_id++;
     ast_root->node_info.program.body = (NodeList) {
         .items = (ASTNode**)arena_alloc(parser->ast_arena, AST_DEFAULT_CAPACITY * sizeof(ASTNode*), alignof(ASTNode*)),
         .capacity = AST_DEFAULT_CAPACITY,
@@ -576,6 +591,7 @@ int initialize_parser(Parser* parser, Arena* arena, TokenBuffer* tokens, Diagnos
     parser->tokens = tokens;
     parser->diags = diags;
     parser->error_list_size = 0;
+    parser->curr_id = 0;
     return 1;
 }
 
