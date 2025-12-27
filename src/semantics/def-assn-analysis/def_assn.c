@@ -52,8 +52,6 @@ void def_assn_pre(void* user, ASTNode* node) {
         }
         case AST_BLOCK:
         {
-            // Push scope
-
             break;
         }
         case AST_VAR_DEC: 
@@ -106,7 +104,9 @@ void def_assn_pre(void* user, ASTNode* node) {
 }
 
 void def_assn_post(void* user, ASTNode* node) {
-
+    DefAssn* defassn = (DefAssn*)user;
+    
+    if (defassn->debug) dump_assigned_bits(defassn);
 }
 
 Visitor def_assn_visitor = {
@@ -132,6 +132,8 @@ bool definite_assignment_init(DefAssn* defassn, Diagnostics* diags, Arena* arena
     size_t words_needed = words_for_locals(total_locals);
     defassn->assigned = arena_alloc(arena, words_needed * sizeof(uint64_t), alignof(uint64_t));
     memset(defassn->assigned, 0, words_needed * sizeof(uint64_t));
+
+    defassn->assigned_size = words_needed;
     return true;
 }
 
@@ -141,5 +143,38 @@ bool name_resolution_init(PtrTable* name_res, Arena* arena) {
 }
 void* name_resolution_get(PtrTable* name_res, size_t i) {
     return get(name_res, i);
+}
+
+void print_bits(uint64_t value, size_t j) {
+    size_t num_bits = 64;
+
+    printf("Assigned (bin), index %zu: ", j);
+    for (size_t i = num_bits - 1; i-- > 0; ) {
+        // Create a mask with the i-th bit set to 1
+        uint64_t mask = (uint64_t)1 << i;
+        
+        // Use bitwise AND (&) to check if the i-th bit of 'value' is set
+        // If the result is non-zero (true), print 1, otherwise print 0
+        if (value & mask) {
+            printf("1");
+        } else {
+            printf("0");
+        }
+
+        // Optional: print a space after every 8 bits for readability
+        if (i % 8 == 0) {
+            printf(" ");
+        }
+    }
+    printf("\n");
+}
+
+void dump_assigned_bits(DefAssn* defassn) {
+
+    size_t arr_size = defassn->assigned_size;
+    for (size_t i = 0; i < arr_size; i++) {
+        print_bits(defassn->assigned[i], i);
+    }
+    printf("\n");
 }
 

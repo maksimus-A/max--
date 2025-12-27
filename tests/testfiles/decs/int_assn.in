@@ -1,4 +1,9 @@
+int x;
+int y = 1;
+x = y;
+y = 3;
 {
     int x;
-    int x;
+    x = 3;
 }
+exit(x);
