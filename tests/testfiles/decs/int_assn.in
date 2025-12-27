@@ -1,8 +1,4 @@
-int x;
-i = y;
 {
-    x = 2;
     int x;
-    x = 3;
+    int x;
 }
-exit(x);

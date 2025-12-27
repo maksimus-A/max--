@@ -28,6 +28,8 @@ set(MAXC_SOURCES
     src/ast/parser/ast_printer.c
     src/semantics/scope.c
     src/semantics/walker.c
+    src/semantics/def-assn-analysis/def_assn.c
+    src/table/ptrtable.c
     src/errors/diagnostics.c
     src/debug.c
     src/common.c

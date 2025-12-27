@@ -6,6 +6,7 @@ typedef struct Symbol {
     SrcSpan symbol_span;
     BuiltInType type;
     bool is_var;
+    size_t id;
     struct Symbol* next;
 } Symbol;
 
@@ -19,6 +20,7 @@ typedef struct Resolver {
     Diagnostics* diags;
     Arena* arena;
     Source* source_file;
+    size_t curr_id; // local var id
     bool debug;
 } Resolver;
 

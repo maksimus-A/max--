@@ -75,14 +75,8 @@ void resolver_pre(void* user, ASTNode* node) {
         {
             // Check if name already exists in scope
             if (symbol_in_scope(resolver->scope, node->node_info.var_decl.name_span, resolver)) {
-                char* err_msg = alloc_error(resolver->diags);
-                const char* ptr = &resolver->source_file->buffer[node->node_info.var_decl.name_span.start];
-
-                snprintf(err_msg, DEFAULT_ERR_MSG_SIZE,
-                        "Symbol '%.*s' has been previously declared.",
-                        (int)node->node_info.var_decl.name_span.length, ptr);
-                LineCol line_col = get_line_col_from_span(node->node_info.var_decl.name_span.start, resolver->source_file);
-                add_diag(resolver->diags, ERROR, node->node_info.var_decl.name_span, err_msg, line_col.line, line_col.col);
+                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.var_decl.name_span, 
+                    "Symbol '%.*s' has been previously declared.", resolver->source_file);
                 break;
             }
             // Declare var in current scope
@@ -90,6 +84,8 @@ void resolver_pre(void* user, ASTNode* node) {
             symbol->symbol_span = node->node_info.var_decl.name_span;
             symbol->type = node->node_info.var_decl.type;
             symbol->is_var = true;
+            symbol->id = resolver->curr_id;
+            resolver->curr_id++;
             // Add symbol to node
             node->node_info.var_decl.symbol = symbol;
             // Push symbol into scope (insert at head)
@@ -115,15 +111,11 @@ void resolver_pre(void* user, ASTNode* node) {
             }
 
             if (name_symbol == NULL) {
-
-
                 create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.assn_stmt.name_span,
                     "Symbol '%.*s' has not been declared.", resolver->source_file);
                 break;
             }
             if (!name_symbol->is_var){
-                const char* ptr = &resolver->source_file->buffer[node->node_info.assn_stmt.name_span.start];
-
                 create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.assn_stmt.name_span, 
                     "Symbol '%.*s' is not an assignable variable.", resolver->source_file);
                 break;
@@ -150,14 +142,8 @@ void resolver_pre(void* user, ASTNode* node) {
                 scope = scope->parent;
             }
             if (!found) { // adds error to diags
-                char* err_msg = alloc_error(resolver->diags);
-                const char* ptr = &resolver->source_file->buffer[wanted.start];
-
-                snprintf(err_msg, DEFAULT_ERR_MSG_SIZE,
-                        "Symbol '%.*s' has not been declared.",
-                        (int)wanted.length, ptr);
-                LineCol line_col = get_line_col_from_span(wanted.start, resolver->source_file);
-                add_diag(resolver->diags, ERROR, wanted, err_msg, line_col.line, line_col.col);
+                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.var_name.name_span, 
+                    "Symbol '%.*s' has not been declared.", resolver->source_file);
                 break;
             }
             // Add symbol to AST_NAME (we verified it exists)
@@ -207,6 +193,7 @@ void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source*
     resolver->arena = arena;
     resolver->scope = NULL;
     resolver->source_file = source_file;
+    resolver->curr_id = 0;
     resolver->debug = debug;
 }
 

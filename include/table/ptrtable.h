@@ -1,3 +1,4 @@
+#pragma once
 #include "arena/arena.h"
 #include <stdbool.h>
 #include <stddef.h>

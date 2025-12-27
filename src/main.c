@@ -14,6 +14,7 @@
 #include "ast/parser/ast_printer.h"
 #include "semantics/scope.h"
 #include "semantics/walker.h"
+#include "semantics/def-assn-analysis/def_assn.h"
 #include "common.h"
 
 #include "debug.h"
@@ -173,6 +174,11 @@ int main(int argc, char **argv) {
 
     if (print_errors(&diags)) return 4;
 
+    DefAssn defassn;
+    definite_assignment_init(&defassn, &diags, &arena, &source_file, args.debug, resolver.curr_id);
+    run_definite_assignment(ast_root, &defassn);
+
+    if (print_errors(&diags)) return 5;
     
     // Free all memory
     free(tokens.data);
@@ -180,6 +186,5 @@ int main(int argc, char **argv) {
     free_ast_arena(&parser);
     
     return 0;
-
 }
 
