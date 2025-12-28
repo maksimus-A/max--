@@ -1,7 +1,17 @@
 // mir = max-- intermediate representation
 #include "errors/diagnostics.h"
 #include "semantics/scope.h"
+#include "vector/vec.h"
 #include <stdint.h>
+
+#define VEC_INIT_T(vec, arena, T) \
+    init_vec((vec), (arena), sizeof(T), alignof(T))
+#define VEC_PUSH_T(vec, value) \
+    push_vec((vec), &(value))
+// Gives the vector at position i.
+#define VEC_AT_T(vec, T, i) \
+    (((T*)(vec)->items)[(i)])
+
 
 typedef enum IRInstructType {
     IR_STORE,
@@ -50,6 +60,7 @@ typedef struct Halt { // comes from exit(0), placeholder for 'return;'
 } Halt;
 /* ------ Instruction payloads ------*/
 
+// Each "vector" will be cast to the proper type
 /* ------ IR structs ------*/
 typedef struct IRInstruct {
     IRInstructType type;
@@ -71,19 +82,16 @@ typedef struct BlockId {
 
 typedef struct IRBlock {
     // list of instructions
-    IRInstruct* instructions;
-
-    // number of instructions
-    size_t count;
-    size_t capacity;
+    // Vector<IRInstruct>
+    Vector instructions;
 } IRBlock;
 
 typedef struct IRFunction {
     // func has list of blocks
-    IRBlock* blocks;
+    // Vector<IRBlock>
+    Vector blocks;
 
-    size_t count;
-    size_t capacity;
+    // starting block in function
     BlockId entry;
 
     // temp register id's
@@ -91,15 +99,17 @@ typedef struct IRFunction {
     // slot table/local count?
 } IRFunction;
 
+typedef struct FuncId {
+    size_t id;
+} FuncId;
+
 typedef struct IRBuilder {
     // list of IRFunctions, each function has blocks
-    IRFunction* functions;
+    // Vector<IrFunction>
+    Vector functions;
 
     // pointer to current func
-    size_t curr_func;
-
-    size_t count;
-    size_t capacity;
+    FuncId curr_func;
 
     // diagnostics struct?
     Diagnostics* diags;
