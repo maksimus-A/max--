@@ -6,7 +6,7 @@
 typedef enum IRInstructType {
     IR_STORE,
     IR_LOAD,
-    IR_HALT // terminates program with status code.
+    IR_HALT // terminates program with status code. (currently exit(0))
     // no instructions allowed after exit.
 } IRInstructType;
 
@@ -45,9 +45,9 @@ typedef struct Load {
     SlotId src;
 } Load;
 
-typedef struct Exit { 
+typedef struct Halt { // comes from exit(0), placeholder for 'return;'
     IRValue code; 
-} Exit;
+} Halt;
 /* ------ Instruction payloads ------*/
 
 /* ------ IR structs ------*/
@@ -57,13 +57,17 @@ typedef struct IRInstruct {
     union inst_payload {
         Store store_payload;
         Load load_payload;
-        Exit exit_payload;
+        Halt halt_payload;
     } payload;
 
     size_t ast_id;
     SrcSpan span;
 
 } IRInstruct;
+
+typedef struct BlockId {
+    size_t id;
+} BlockId;
 
 typedef struct IRBlock {
     // list of instructions
@@ -74,15 +78,28 @@ typedef struct IRBlock {
     size_t capacity;
 } IRBlock;
 
-typedef struct IRBuilder {
-    // list of IRBlocks, each block has instructions
+typedef struct IRFunction {
+    // func has list of blocks
     IRBlock* blocks;
 
-    // pointer to current block
-    size_t curr_block;
-    
-    size_t block_count;
-    size_t block_capacity;
+    size_t count;
+    size_t capacity;
+    BlockId entry;
+
+    // temp register id's
+    size_t next_temp_id;
+    // slot table/local count?
+} IRFunction;
+
+typedef struct IRBuilder {
+    // list of IRFunctions, each function has blocks
+    IRFunction* functions;
+
+    // pointer to current func
+    size_t curr_func;
+
+    size_t count;
+    size_t capacity;
 
     // diagnostics struct?
     Diagnostics* diags;
