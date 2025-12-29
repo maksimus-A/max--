@@ -6,3 +6,4 @@ typedef struct Visitor {
 } Visitor;
 
 void walk_node(Visitor* visitor, void* user, ASTNode* node);
+ASTNode* get_child_expr(ASTNode* node);
