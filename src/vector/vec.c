@@ -22,7 +22,7 @@ bool ensure_capacity_vec(Vector* vec) {
     return true;
 }
 
-bool push_vec(Vector* vec, const void* item) {
+bool vec_push(Vector* vec, const void* item) {
     if (ensure_capacity_vec(vec)) {
         size_t count = vec->count;
         // memcpy item into vec->items
@@ -35,7 +35,7 @@ bool push_vec(Vector* vec, const void* item) {
     return false;
 }
 
-void init_vec(Vector* vec, Arena* arena, size_t item_size, size_t item_align) {
+void vec_init(Vector* vec, Arena* arena, size_t item_size, size_t item_align) {
     vec->arena = arena;
     vec->capacity = DEFAULT_VEC_SIZE;
     vec->count = 0;

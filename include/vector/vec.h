@@ -16,5 +16,5 @@ typedef struct Vector {
     Arena* arena;
 } Vector;
 
-bool push_vec(Vector* vec, const void* item);
-void init_vec(Vector* vec, Arena* arena, size_t item_size, size_t item_align);
+bool vec_push(Vector* vec, const void* item);
+void vec_init(Vector* vec, Arena* arena, size_t item_size, size_t item_align);
