@@ -1,6 +1,7 @@
 // mir = max-- intermediate representation
 #include "errors/diagnostics.h"
 #include "semantics/scope.h"
+#include "table/ptrtable.h"
 #include "vector/vec.h"
 #include <stdint.h>
 
@@ -41,6 +42,7 @@ typedef enum IRValueKind {
 // Stores either an Immediate (literal) or a Temp.
 typedef struct IRValue {
     IRValueKind value_kind;
+    // Represents whether val is a temp or immediate.
     union {
         int64_t imm; // immediate
         TempId temp_id;
@@ -88,6 +90,7 @@ typedef struct IRBlock {
     // list of instructions
     // Vector<IRInstruct>
     Vector instructions;
+    BlockId id;
 } IRBlock;
 
 typedef struct FuncId {
@@ -122,10 +125,12 @@ typedef struct IRBuilder {
 
     // Counters for creating unique IDs
     BlockId next_block_id;
-    // todo: Get rid of this? Temp IDs are local to funcs?
-    TempId next_temp_id;
 
+    // Arena alloc
     Arena* arena;
+
+    // Symbol/slot table
+    PtrTable slots;
 
     // diagnostics struct?
     Diagnostics* diags;
@@ -133,4 +138,6 @@ typedef struct IRBuilder {
 /* ------ IR structs ------*/
 
 void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags);
+void run_mir_gen(ASTNode* ast_root, IRBuilder* builder);
+bool dump_mir(IRBuilder* builder, FILE* output);
 

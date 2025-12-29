@@ -15,6 +15,7 @@
 #include "semantics/scope.h"
 #include "semantics/walker.h"
 #include "semantics/def-assn-analysis/def_assn.h"
+#include "codegen/ir-gen/mir.h"
 #include "common.h"
 
 #include "debug.h"
@@ -179,11 +180,19 @@ int main(int argc, char **argv) {
     run_definite_assignment(ast_root, &defassn);
 
     if (print_errors(&diags)) return 5;
+
+    // max-- IR generation
+    IRBuilder builder;
+    builder_init(&builder, &arena, &diags);
+    run_mir_gen(ast_root, &builder);
+
+    // Dump MIR in human readable format
+    if (args.debug) dump_mir(&builder, stdout);
     
     // Free all memory
     free(tokens.data);
     free_source(&source_file);
-    free_ast_arena(&parser);
+    free_ast_arena(&parser); // todo: just free arena; confusing naming.
     
     return 0;
 }

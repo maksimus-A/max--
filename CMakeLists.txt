@@ -23,13 +23,20 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ${MAXC_EXPORT_COMPILE_COMMANDS})
 # ---- Sources ----
 set(MAXC_SOURCES
     src/main.c
+    # AST
     src/ast/lexer/lexer.c
     src/ast/parser/parser.c
     src/ast/parser/ast_printer.c
+    # Semantic analyzers
     src/semantics/scope.c
     src/semantics/walker.c
     src/semantics/def-assn-analysis/def_assn.c
+    # Code generation
+    src/codegen/ir-gen/mir.c
+
+    # Helpers
     src/table/ptrtable.c
+    src/vector/vec.c
     src/errors/diagnostics.c
     src/debug.c
     src/common.c
