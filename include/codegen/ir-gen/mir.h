@@ -5,12 +5,16 @@
 #include <stdint.h>
 
 #define VEC_INIT_T(vec, arena, T) \
-    init_vec((vec), (arena), sizeof(T), alignof(T))
+    vec_init((vec), (arena), sizeof(T), alignof(T))
 #define VEC_PUSH_T(vec, value) \
-    push_vec((vec), &(value))
-// Gives the vector at position i.
+    vec_push((vec), &(value))
+// Gives the item in vector at position i.
 #define VEC_AT_T(vec, T, i) \
     (((T*)(vec)->items)[(i)])
+// Gives a pointer to item in vector at position i.
+#define VEC_AT_PTR_T(vec, T, i) \
+    (&((T*)(vec)->items)[(i)])
+
 
 
 typedef enum IRInstructType {
@@ -86,6 +90,10 @@ typedef struct IRBlock {
     Vector instructions;
 } IRBlock;
 
+typedef struct FuncId {
+    size_t id;
+} FuncId;
+
 typedef struct IRFunction {
     // func has list of blocks
     // Vector<IRBlock>
@@ -95,24 +103,34 @@ typedef struct IRFunction {
     BlockId entry;
 
     // temp register id's
-    size_t next_temp_id;
+    TempId next_temp_id;
     // slot table/local count?
-} IRFunction;
 
-typedef struct FuncId {
-    size_t id;
-} FuncId;
+    // Funciton ID
+    FuncId id;
+} IRFunction;
 
 typedef struct IRBuilder {
     // list of IRFunctions, each function has blocks
     // Vector<IrFunction>
-    Vector functions;
+    Vector funcs;
 
-    // pointer to current func
-    FuncId curr_func;
+    // pointer to current func (the ID of the function)
+    // used to index directly into vector when inserting instructions
+    size_t curr_func_index;
+    size_t curr_block_index;
+
+    // Counters for creating unique IDs
+    BlockId next_block_id;
+    // todo: Get rid of this? Temp IDs are local to funcs?
+    TempId next_temp_id;
+
+    Arena* arena;
 
     // diagnostics struct?
     Diagnostics* diags;
 } IRBuilder;
 /* ------ IR structs ------*/
+
+void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags);
 
