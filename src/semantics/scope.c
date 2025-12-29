@@ -10,8 +10,13 @@
 #include "errors/diagnostics.h"
 #include "semantics/scope.h"
 #include "semantics/walker.h"
+#include "table/ptrtable.h"
 
-// todo: modify to accommodate 'int x;'
+// todo: modify to accommodate 'int x;'(solved?)
+
+void add_symbol_to_table(Semantics* sema, Symbol* sym) {
+    set_ptr_tbl(&sema->name_resolution, sym, sym->id);
+}
 
 bool symbols_eq(SrcSpan a, SrcSpan b, Source* source_file) {
     if (a.length != b.length) return false;
@@ -79,6 +84,8 @@ void resolver_pre(void* user, ASTNode* node) {
                     "Symbol '%.*s' has been previously declared.", resolver->source_file);
                 break;
             }
+            // currently only place symbol is created at all, but be careful
+            // about adding them to the table properly.
             // Declare var in current scope
             Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
             symbol->symbol_span = node->node_info.var_decl.name_span;
@@ -86,6 +93,7 @@ void resolver_pre(void* user, ASTNode* node) {
             symbol->is_var = true;
             symbol->id = resolver->curr_id;
             resolver->curr_id++;
+            add_symbol_to_table(resolver->semantics, symbol);
             // Add symbol to node
             node->node_info.var_decl.symbol = symbol;
             // Push symbol into scope (insert at head)
@@ -195,6 +203,13 @@ void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source*
     resolver->source_file = source_file;
     resolver->curr_id = 0;
     resolver->debug = debug;
+
+    // TODO: IDK if the resolver should handle this stuff
+    // about the semantics table since lots of passes will use it probably.
+    PtrTable name_res;
+    ptr_table_init(&name_res, arena);
+    resolver->semantics = arena_alloc(arena, sizeof(Semantics), alignof(Semantics));
+    resolver->semantics->name_resolution = name_res;
 }
 
 // Prints symbol at specified span (start, length)

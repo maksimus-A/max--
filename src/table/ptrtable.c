@@ -39,15 +39,15 @@ bool ensure_slots(PtrTable* ptr_table, size_t n) {
     return true;
 }
 
-
-bool set(PtrTable* ptr_table, void* ptr, size_t i) {
+// Sets items[i] of table to item.
+bool set_ptr_tbl(PtrTable* ptr_table, void* item, size_t i) {
     if (!ensure_slots(ptr_table, i+1)) return false;
 
-    ptr_table->items[i] = ptr;
+    ptr_table->items[i] = item;
     return true;
 }
 
-void* get(PtrTable* ptr_table, size_t i) {
+void* get_ptr_tbl(PtrTable* ptr_table, size_t i) {
     if (i < ptr_table->slots) return ptr_table->items[i];
     return NULL;
 }
@@ -56,9 +56,7 @@ bool ptr_table_init(PtrTable* ptr_table, Arena* arena) {
     ptr_table->arena = arena;
     ptr_table->items = arena_alloc(arena, DEFAULT_PTR_TABLE_CAPACITY * sizeof(void*), alignof(void*));
     ptr_table->slots = DEFAULT_PTR_TABLE_CAPACITY;
-    if (!zero_set_unused(ptr_table, ptr_table->items, DEFAULT_PTR_TABLE_CAPACITY)) {
-        fprintf(stderr, "Failed to zero-set new pointer table.");
-        return false;
-    }
+    memset(ptr_table->items, 0, ptr_table->slots * sizeof(void*));
+    
     return true;
 }

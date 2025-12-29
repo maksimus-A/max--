@@ -1,5 +1,4 @@
 #include "semantics/scope.h"
-#include "semantics/semantics.h"
 #include "table/ptrtable.h"
 
 // Definite Assignment Analyzer

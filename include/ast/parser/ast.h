@@ -27,12 +27,6 @@ typedef enum BuiltInType {
     // todo: add more types as we go
 } BuiltInType;
 
-typedef struct SrcSpan {
-    // Used to store variable name + location.
-    size_t length;
-    size_t start;
-} SrcSpan;
-
 /*------- INFORMATION STRUCTS -------*/
 
 // NodeList (for funcs, program, blocks, etc)

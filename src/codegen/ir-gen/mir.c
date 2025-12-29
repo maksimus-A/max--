@@ -1,7 +1,9 @@
 #include "codegen/ir-gen/mir.h"
 #include "arena/arena.h"
 #include "ast/parser/ast.h"
+#include "common.h"
 #include "semantics/walker.h"
+#include "table/ptrtable.h"
 #include <assert.h>
 #include <stdalign.h>
 
@@ -310,7 +312,7 @@ void run_mir_gen(ASTNode* ast_root, IRBuilder* builder) {
     walk_node(&mir_gen_visitor, builder, ast_root);
 }
 
-void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags) {
+void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags, Semantics* sema, Source* source_file) {
     // initialize IRFunc
     VEC_INIT_T(&builder->funcs, arena, IRFunction);
     builder->next_block_id.id = 0;
@@ -320,18 +322,41 @@ void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags) {
 
     builder->diags = diags;
     builder->arena = arena;
+    builder->sema = sema;
+    builder->source_file = source_file;
 }
 
 /*------ MIR PRINTING ------*/
 
-void print_instruction(IRInstruct* instr, FILE* output) {
+void print_slot(IRBuilder* builder, size_t symbol_id, FILE* output) {
+    PtrTable name_res = builder->sema->name_resolution;
+    Symbol* var_symbol = get_ptr_tbl(&name_res, symbol_id);
+    SrcSpan name_span = var_symbol->symbol_span;
+    char* name_ptr = start_of_name(name_span, builder->source_file);
+    fprintf(output, "slot(");
+    print_file_slice(name_ptr, name_span.length, output);
+    fprintf(output, ")");
+}
+
+void print_slot_with_id(IRBuilder* builder, size_t symbol_id, FILE* output) {
+    PtrTable name_res = builder->sema->name_resolution;
+    Symbol* var_symbol = get_ptr_tbl(&name_res, symbol_id);
+    SrcSpan name_span = var_symbol->symbol_span;
+    char* name_ptr = start_of_name(name_span, builder->source_file);
+    fprintf(output, "slot(");
+    print_file_slice(name_ptr, name_span.length, output);
+    fprintf(output, ":%zu)", symbol_id);
+}
+
+void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output) {
     switch (instr->type) {
         case IR_LOAD:
         {
             // load dst, src
             // todo: change slot to be actual variable, not int.
             Load load = instr->payload.load_payload;
-            fprintf(output, "load t%zu, slot(%zu)", load.dst.id, load.src.id);
+            fprintf(output, "load t%zu, ", load.dst.id);
+            print_slot_with_id(builder, load.src.id, output);
             break;
         }
         case IR_STORE:
@@ -339,10 +364,14 @@ void print_instruction(IRInstruct* instr, FILE* output) {
             // store dst, src
             Store store = instr->payload.store_payload;
             if (store.src.value_kind == IRVAL_IMM) {
-                fprintf(output, "store slot(%zu), %lld", store.dst.id, store.src.value_id.imm);
+                fprintf(output, "store ");
+                print_slot_with_id(builder, store.dst.id, output);
+                fprintf(output, ", %lld", store.src.value_id.imm);
             }
             else if (store.src.value_kind == IRVAL_TEMP) {
-                fprintf(output, "store slot(%zu), t%zu", store.dst.id, store.src.value_id.temp_id.id);
+                fprintf(output, "store ");
+                print_slot_with_id(builder, store.dst.id, output);
+                fprintf(output, ", t%zu", store.src.value_id.temp_id.id);
             }
             break;
         }
@@ -378,7 +407,7 @@ bool dump_mir(IRBuilder* builder, FILE* output) {
             for (int k = 0; k < b->instructions.count; k++) {
                 fprintf(output, "    ");
                 IRInstruct* instruction = get_nth_instruction(b, k);
-                print_instruction(instruction, output);
+                print_instruction(builder, instruction, output);
             }
         }
     }

@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "ast/parser/ast.h"
 #include "common.h"
 
 Result read_source_file(FILE* fp, Source* out) {
@@ -59,4 +60,16 @@ LineCol get_line_col_from_span(size_t start_loc, Source* source_file) {
     }
 
     return line_col;
+}
+
+// Grabs actual string name (start pointer) from span in buffer.
+char* start_of_name(SrcSpan span, Source* source_file) {
+    return &source_file->buffer[span.start];
+}
+
+// Prints a slice of the input file (typically a var)
+void print_file_slice(char* start_ptr, size_t length, FILE* output) {
+    for (size_t i = 0; i < length; i++) {
+        fprintf(output, "%c", *(start_ptr + i));
+    }
 }

@@ -1,9 +1,9 @@
-#include <assert.h>
-#include <stdalign.h>
 #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
 #include "arena/arena_test.h"
 #endif
 
+#include <assert.h>
+#include <stdalign.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,7 +17,6 @@
 #include "semantics/def-assn-analysis/def_assn.h"
 #include "codegen/ir-gen/mir.h"
 #include "common.h"
-
 #include "debug.h"
 
 
@@ -183,7 +182,7 @@ int main(int argc, char **argv) {
 
     // max-- IR generation
     IRBuilder builder;
-    builder_init(&builder, &arena, &diags);
+    builder_init(&builder, &arena, &diags, resolver.semantics, &source_file);
     run_mir_gen(ast_root, &builder);
 
     // Dump MIR in human readable format

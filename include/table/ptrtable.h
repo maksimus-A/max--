@@ -11,6 +11,6 @@ typedef struct PtrTable {
     Arena* arena;
 } PtrTable;
 
-bool set(PtrTable* ptr_table, void* ptr, size_t i);
-void* get(PtrTable* ptr_table, size_t i);
+bool set_ptr_tbl(PtrTable* ptr_table, void* ptr, size_t i);
+void* get_ptr_tbl(PtrTable* ptr_table, size_t i);
 bool ptr_table_init(PtrTable* ptr_table, Arena* arena);

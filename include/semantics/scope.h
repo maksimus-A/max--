@@ -1,6 +1,7 @@
 #pragma once
 #include "ast/parser/ast.h"
 #include "errors/diagnostics.h"
+#include "semantics/semantics.h"
 
 typedef struct Symbol { 
     SrcSpan symbol_span;
@@ -22,6 +23,7 @@ typedef struct Resolver {
     Source* source_file;
     size_t curr_id; // local var id
     bool debug;
+    Semantics* semantics; // CURRENTLY: for name_resolution table
 } Resolver;
 
 void run_resolver(ASTNode* ast_root, Resolver* resolver);

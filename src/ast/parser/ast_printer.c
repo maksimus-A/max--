@@ -13,17 +13,7 @@ char* get_type_string(BuiltInType type) {
     return built_in_type_string[type];
 }
 
-// Grabs actual string name (start pointer) from span in buffer.
-char* start_of_name(SrcSpan span, Source* source_file) {
-    return &source_file->buffer[span.start];
-}
 
-// Prints a slice of the input file.
-void print_file_slice(char* start_ptr, size_t length) {
-    for (size_t i = 0; i < length; i++) {
-        printf("%c", *(start_ptr + i));
-    }
-}
 
 // Prints indents equal to number of indents.
 void print_indentation(int indent) {
@@ -60,7 +50,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             char* start_ptr = start_of_name(node->node_info.var_decl.name_span, source_file);
 
             printf("VarDecl id={%d} type={%s} name={", (int)node->id, get_type_string(node->node_info.var_decl.type));
-            print_file_slice(start_ptr, node->node_info.var_decl.name_span.length);
+            print_file_slice(start_ptr, node->node_info.var_decl.name_span.length, stdout);
             printf("}");
             
             if (node->node_info.var_decl.init_expr != NULL) {
@@ -86,7 +76,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             printf("VarName id={%d} name={", (int)node->id);
 
             char* start_ptr = start_of_name(node->node_info.var_name.name_span, source_file);
-            print_file_slice(start_ptr, node->node_info.var_name.name_span.length);
+            print_file_slice(start_ptr, node->node_info.var_name.name_span.length, stdout);
             printf("})\n");
             break;
         }
@@ -107,7 +97,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             char* start_ptr = start_of_name(node->node_info.assn_stmt.name_span, source_file);
 
             printf("AssnStmt id={%d} type={%s} name={", (int)node->id, get_type_string(node->node_info.assn_stmt.type));
-            print_file_slice(start_ptr, node->node_info.assn_stmt.name_span.length);
+            print_file_slice(start_ptr, node->node_info.assn_stmt.name_span.length, stdout);
             printf("}\n");
 
             indent++;

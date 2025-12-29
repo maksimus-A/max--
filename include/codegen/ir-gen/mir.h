@@ -134,10 +134,16 @@ typedef struct IRBuilder {
 
     // diagnostics struct?
     Diagnostics* diags;
+
+    // Semantics tables
+    Semantics* sema;
+
+    // Source file (mostly for printing MIR)
+    Source* source_file;
 } IRBuilder;
 /* ------ IR structs ------*/
 
-void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags);
+void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags, Semantics* sema, Source* source_file);
 void run_mir_gen(ASTNode* ast_root, IRBuilder* builder);
 bool dump_mir(IRBuilder* builder, FILE* output);
 
