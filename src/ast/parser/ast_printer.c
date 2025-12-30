@@ -4,7 +4,11 @@
 #include "common.h"
 
 char* built_in_type_string[TYPE_TOTAL_COUNT] = {
-    /*TYPE_INT*/         "int",
+    /*TYPE_INT*/         "int", // Converts to i32
+
+    // Signed integers
+    /*TYPE_SI64*/        "i64",
+
     /*TYPE_BOOL*/        "bool",
     /*TYPE_CHAR*/        "char",
 };

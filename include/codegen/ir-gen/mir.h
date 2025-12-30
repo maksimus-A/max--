@@ -1,8 +1,8 @@
 // mir = max-- intermediate representation
+#pragma once
 #include "errors/diagnostics.h"
 #include "semantics/scope.h"
 #include "table/ptrtable.h"
-#include "vector/vec.h"
 #include <stdint.h>
 
 #define VEC_INIT_T(vec, arena, T) \
@@ -16,7 +16,8 @@
 #define VEC_AT_PTR_T(vec, T, i) \
     (&((T*)(vec)->items)[(i)])
 
-
+// todo: add terminators to each block.
+// they can be 'return', 'br', 'brc', etc
 
 typedef enum IRInstructType {
     IR_STORE,
@@ -24,6 +25,12 @@ typedef enum IRInstructType {
     IR_HALT // terminates program with status code. (currently exit(0))
     // no instructions allowed after exit.
 } IRInstructType;
+
+typedef enum IRTerminator {
+    IR_TERM_RETURN,
+    IR_TERM_UBR, // unconditional branch
+    IR_TERM_CBR // conditional branch
+} IRTerminator;
 
 /* ------ Instruction payload helpers ------*/
 typedef struct SlotId {
@@ -42,11 +49,12 @@ typedef enum IRValueKind {
 // Stores either an Immediate (literal) or a Temp.
 typedef struct IRValue {
     IRValueKind value_kind;
+    BuiltInType value_type;
     // Represents whether val is a temp or immediate.
     union {
         int64_t imm; // immediate
         TempId temp_id;
-    } value_id;
+    } value_id; 
 } IRValue;
 /* ------ Instruction payload helpers ------*/
 
@@ -61,6 +69,7 @@ typedef struct Load {
     SlotId src;
 } Load;
 
+// TODO: Refactor to 'return' once functions exist.
 typedef struct Halt { // comes from exit(0), placeholder for 'return;'
     IRValue code; 
 } Halt;
@@ -146,4 +155,9 @@ typedef struct IRBuilder {
 void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags, Semantics* sema, Source* source_file);
 void run_mir_gen(ASTNode* ast_root, IRBuilder* builder);
 bool dump_mir(IRBuilder* builder, FILE* output);
+
+IRFunction* get_nth_func(Vector* funcs, int i);
+IRBlock* get_nth_block(IRFunction* func, int i);
+IRInstruct* get_nth_instruction(IRBlock* block, int i);
+
 

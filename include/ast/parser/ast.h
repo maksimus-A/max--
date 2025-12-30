@@ -20,7 +20,10 @@ typedef enum ASTKind {
 
 typedef enum BuiltInType {
     // Always add BuiltInType to string list in ast_printer.c
-    TYPE_INT,
+    // TODO: Convert internally to SI32. (REMOVE)
+    TYPE_INT, // converts to SI32.
+    TYPE_SI64,
+
     TYPE_BOOL,
     TYPE_CHAR,
     TYPE_TOTAL_COUNT

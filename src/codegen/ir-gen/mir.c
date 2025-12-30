@@ -12,16 +12,18 @@ bool emit_load(IRBuilder* builder, ASTNode* node, TempId dst, SlotId src);
 SlotId get_slot_id(IRBuilder* builder, ASTNode* node);
 
 // Grabs n-th function in function list.
-IRFunction* get_nth_func(IRBuilder* builder, int i) {
+IRFunction* get_nth_func(Vector* funcs, int i) {
     if (i == SIZE_MAX) return NULL;
-    if (i >= builder->funcs.count) return NULL;
-    return VEC_AT_PTR_T(&builder->funcs, IRFunction, i);
+    // todo: i want this api in other files but
+    // they dont have the builder included.
+    // if (i >= builder->funcs.count) return NULL;
+    return VEC_AT_PTR_T(funcs, IRFunction, i);
 }
 
 // Grabs pointer to current IRFunction being used inside builder.
 IRFunction* get_curr_func(IRBuilder* builder) {
     if (builder->curr_func_index == SIZE_MAX) return NULL;
-    return get_nth_func(builder, builder->curr_func_index);
+    return get_nth_func(&builder->funcs, builder->curr_func_index);
 }
 
 // Grabs n-th block by index in specific function.
@@ -396,7 +398,7 @@ bool dump_mir(IRBuilder* builder, FILE* output) {
     // Goes through all instructions and prints accordingly
     size_t block_index = 0;
     for (int i = 0; i < builder->funcs.count; i++) {
-        IRFunction* f = get_nth_func(builder, i);
+        IRFunction* f = get_nth_func(&builder->funcs, i);
         fprintf(output, "function_%zu:\n", f->id.id);
 
         for (int j = 0; j < f->blocks.count; j++) {

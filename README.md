@@ -6,17 +6,26 @@ The point was to help me learn both how the bootstrapping process works, how to 
 
 Right now I'm focusing on max-1, a simple, minimal language spec I can use to help self-host the rest of the compiler. I'll write it in C (I was going to do assembly for pureism but that sounded a bit too painful).
 
-The language will only compile to x86. I could have used LLVM as my target but I wanted to also learn about the backend compilation process.
+The language will only compile to ARM64 for mac. I could have used LLVM as my target but I wanted to also learn about the backend compilation process.
 
 ## Current Progress
 
-Currently lexes functions and integer declarations, and parses integer declarations only.
+Currently supports:
 
-Working on better error reporting for the parser.
+Frontend:
+- lexes functions and integer declarations, and parses integer declarations/assignmentns only.
+- A scope resolution pass.
+- A definite assignment analysis pass.
+- A max-- intermediate representation (MIR) generation pass.
+
+Backend:
+- Currently working on. Learning about how backends work in general.
+
+Lots of fixes in the making; will refactor error handling of parsing. I chose ARM64 now instead of x86.
 
 ## Basic setup
 
-- Run `./compile.sh`. It'll take care of everything for you :)
+- Run `./compile.sh`. It'll take care of everything for you I think :)
 
 If you'd rather configure some stuff:
 ```

@@ -1,4 +1,6 @@
 #pragma once
+#include "table/ptrtable.h"
+#include "vector/vec.h"
 #include <stdio.h>
 
 #define START_BUFFER_SIZE 16
@@ -6,30 +8,40 @@
 // TODO: Result should also return
 // a pointer to a struct I need? Right now
 // it's kinda useless, could just return int.
-struct Result {
+typedef struct Result {
     int error_code;
     const char* error_message;
     void* data; // TODO:CHECK if necessary?
-};
-typedef struct Result Result;
+}Result;
 
-struct Source { // Source file
+// Source file
+typedef struct Source { 
     const char* path;
     size_t length;
     char* buffer;
-};
-typedef struct Source Source;
+} Source;
 
+// Stores line and column of a symbol.
 typedef struct LineCol {
     size_t line;
     size_t col;
 } LineCol;
 
+// Used to store variable name + location.
 typedef struct SrcSpan {
-    // Used to store variable name + location.
     size_t length;
     size_t start;
 } SrcSpan;
+
+// Backend structs (IR -> ARM)
+
+// Stores a bunch of useful tables used during
+// backend analysis
+typedef struct IRModule{
+    Vector* funcs;
+    PtrTable* slot_type; // slot_id -> symbol type
+    PtrTable* temp_inst; // tempid -> instruction
+} IRModule;
 
 Result read_source_file(FILE* fp, Source* out); // Should return buffer of file ??
 void free_source(Source* s);
