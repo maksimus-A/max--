@@ -66,8 +66,9 @@ bool insert_instruction(IRBuilder* builder, IRInstruct inst) {
 /*------ AST Node -> IR Value/Slot conversion ------*/
 
 // Currently supports turning immediates and variables
-// into IR values.
+// into IR values, and emits a load into temp.
 IRValue get_ir_value(IRBuilder* builder, ASTNode* node) {
+    // TODO*: Be explicit this emits a load (for your future self).
     IRValue val = {0};
 
     switch (node->ast_kind) {
@@ -293,6 +294,7 @@ void mir_gen_post(void* user, ASTNode* node) {
         }
         case AST_EXIT:
         {
+            
             ASTNode* expr_node = get_child_expr(node);
             if (expr_node == NULL) return;
 

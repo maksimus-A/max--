@@ -31,8 +31,12 @@ set(MAXC_SOURCES
     src/semantics/scope.c
     src/semantics/walker.c
     src/semantics/def-assn-analysis/def_assn.c
-    # Code generation
+    # IR generation
     src/codegen/ir-gen/mir.c
+    # IR verification
+    src/codegen/backend/ir-verify/ir_verify.c
+    # IR walkers
+    src/codegen/backend/ir_walkers.c
 
     # Helpers
     src/table/ptrtable.c

@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "ast/parser/ast.h"
+#include "ast/parser/parser.h"
 #include "common.h"
+#include "table/ptrtable.h"
 
 Result read_source_file(FILE* fp, Source* out) {
     // TODO: FREE THE BUFFER AFTER PARSING!
@@ -72,4 +74,11 @@ void print_file_slice(char* start_ptr, size_t length, FILE* output) {
     for (size_t i = 0; i < length; i++) {
         fprintf(output, "%c", *(start_ptr + i));
     }
+}
+
+// Initialize IR Module.
+void ir_module_init(IRModule* mod, Vector* funcs, PtrTable* name_res) {
+    mod->funcs = funcs;
+    mod->name_resolution = name_res; // found in struct Semantics
+    // TODO: Add 2 other tables once they're actually used.
 }

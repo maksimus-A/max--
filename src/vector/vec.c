@@ -44,3 +44,7 @@ void vec_init(Vector* vec, Arena* arena, size_t item_size, size_t item_align) {
     vec->item_align = item_align;
     vec->items = arena_alloc(arena, item_size * vec->capacity, item_align);
 }
+
+void vec_clear(Vector* vec) {
+    vec->count = 0;
+}

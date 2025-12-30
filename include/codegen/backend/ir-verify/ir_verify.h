@@ -4,9 +4,15 @@
 #include "codegen/backend/ir_walkers.h"
 
 typedef struct IRVerify {
-    // todo: might not need this at all.
-    IRModule* ir;
+    // todo: initialize this struct.
+    IRModule* ir_module;
+    Diagnostics* ir_diags;
+    Arena* arena;
+    IRInstruct** temp_def; // temps previously seen (per function)
+    size_t temp_cap;
+
+    size_t inst_visited;
 } IRVerify;
 
-
-void ir_walk_func_linear(IRVisitor* visitor, void* user, Vector* funcs);
+void run_ir_verifier(IRVerify* verifier, Vector* funcs);
+void ir_verifier_init(IRVerify* verifier, Diagnostics* ir_diags, Arena* arena, IRModule* ir_module);

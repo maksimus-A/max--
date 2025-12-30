@@ -1,3 +1,4 @@
+#include "codegen/backend/ir-verify/ir_verify.h"
 #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
 #include "arena/arena_test.h"
 #endif
@@ -187,6 +188,24 @@ int main(int argc, char **argv) {
 
     // Dump MIR in human readable format
     if (args.debug) dump_mir(&builder, stdout);
+
+    /*------ BACKEND PASSES ------*/
+    // Initialize new Diagnostics for iR
+    Diagnostics ir_diags;
+    diags_init(&ir_diags, &arena, 16);
+    assert(ir_diags.items != NULL);
+
+    // Initialize IR Module (useful tables)
+    IRModule mod;
+    ir_module_init(&mod, &builder.funcs, &resolver.semantics->name_resolution);
+
+    // Initialize IR Verification pass
+    IRVerify verifier = {0};
+    ir_verifier_init(&verifier, &ir_diags, &arena, &mod);
+
+    run_ir_verifier(&verifier, &builder.funcs);
+
+    if (args.debug) fprintf(stdout, "\nIR Verifier: Instructions visited: %zu\n", verifier.inst_visited);
     
     // Free all memory
     free(tokens.data);

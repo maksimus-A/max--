@@ -48,6 +48,7 @@ bool set_ptr_tbl(PtrTable* ptr_table, void* item, size_t i) {
 }
 
 void* get_ptr_tbl(PtrTable* ptr_table, size_t i) {
+    // todo: verify this returns NULL if items[i] doesn't exist.
     if (i < ptr_table->slots) return ptr_table->items[i];
     return NULL;
 }

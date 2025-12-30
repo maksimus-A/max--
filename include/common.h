@@ -38,9 +38,11 @@ typedef struct SrcSpan {
 // Stores a bunch of useful tables used during
 // backend analysis
 typedef struct IRModule{
+    // todo: initialize all ptr tables/IRModule
     Vector* funcs;
     PtrTable* slot_type; // slot_id -> symbol type
     PtrTable* temp_inst; // tempid -> instruction
+    PtrTable* name_resolution; // slot_id -> symbol
 } IRModule;
 
 Result read_source_file(FILE* fp, Source* out); // Should return buffer of file ??
@@ -53,3 +55,5 @@ char* start_of_name(SrcSpan span, Source* source_file);
 
 // Prints a slice of the input file (typically a var)
 void print_file_slice(char* start_ptr, size_t length, FILE* output);
+
+void ir_module_init(IRModule* mod, Vector* funcs, PtrTable* name_res);
