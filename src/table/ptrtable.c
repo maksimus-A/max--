@@ -44,6 +44,7 @@ bool set_ptr_tbl(PtrTable* ptr_table, void* item, size_t i) {
     if (!ensure_slots(ptr_table, i+1)) return false;
 
     ptr_table->items[i] = item;
+    ptr_table->count++;
     return true;
 }
 
@@ -58,6 +59,8 @@ bool ptr_table_init(PtrTable* ptr_table, Arena* arena) {
     ptr_table->items = arena_alloc(arena, DEFAULT_PTR_TABLE_CAPACITY * sizeof(void*), alignof(void*));
     ptr_table->slots = DEFAULT_PTR_TABLE_CAPACITY;
     memset(ptr_table->items, 0, ptr_table->slots * sizeof(void*));
+
+    ptr_table->count = 0;
     
     return true;
 }

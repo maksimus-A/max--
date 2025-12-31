@@ -111,6 +111,11 @@ typedef struct IRFunction {
     // Vector<IRBlock>
     Vector blocks;
 
+    // TODO: Separate per-func slot id from global slot id.
+    size_t next_slot_id;
+    // Guarantee: slot id's are dense, and slot_index == slot_id.
+    PtrTable slot_sym; // maps slot_id -> Symbol.
+
     // starting block in function
     BlockId entry;
 

@@ -222,6 +222,11 @@ void begin_function(IRBuilder* builder) {
     size_t func_id = builder->funcs.count;
     func.id.id = func_id;
     func.next_temp_id = (TempId) {.id=0};
+
+    // Set next slot id to 0 (separate from symbol ID).
+    func.next_slot_id = 0;
+    ptr_table_init(&func.slot_sym, builder->arena);
+
     // push function into builder
     VEC_PUSH_T(&builder->funcs, func);
 
@@ -265,9 +270,18 @@ void mir_gen_post(void* user, ASTNode* node) {
             ASTNode* expr_node = get_child_expr(node);
             if (expr_node == NULL) return;
             // todo: heavily relies on the fact the RHS is either int lit or one var
-            IRValue expr_val = get_ir_value(builder, expr_node);
+            IRValue expr_val = get_ir_value(builder, expr_node); // emits load op
             // slot of RHS
             SlotId lhs_slot = get_slot_id(builder, node);
+
+            // Add 1 to function slot count for later, and
+            // add slot_id to function slots table.
+            IRFunction* f = get_curr_func(builder);
+            
+            // Gets symbol from node, sets slot_i to symbol for function.
+            set_ptr_tbl(&f->slot_sym, node->node_info.var_decl.symbol, f->next_slot_id);
+            f->next_slot_id++;
+
             assert(lhs_slot.id != SIZE_MAX);
             // Emit 1 store op
             emit_store(builder, node, lhs_slot, expr_val);

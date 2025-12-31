@@ -9,7 +9,7 @@ typedef struct IRVerify {
     Diagnostics* ir_diags;
     Arena* arena;
     IRInstruct** temp_def; // temps previously seen (per function)
-    size_t temp_cap;
+    size_t temp_cap; // max temps seen per function
 
     size_t inst_visited;
 } IRVerify;

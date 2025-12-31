@@ -16,6 +16,7 @@
 #include "semantics/scope.h"
 #include "semantics/walker.h"
 #include "semantics/def-assn-analysis/def_assn.h"
+#include "codegen/backend/frame-layout/arm64/frame_lay.h"
 #include "codegen/ir-gen/mir.h"
 #include "common.h"
 #include "debug.h"
@@ -206,6 +207,12 @@ int main(int argc, char **argv) {
     run_ir_verifier(&verifier, &builder.funcs);
 
     if (args.debug) fprintf(stdout, "\nIR Verifier: Instructions visited: %zu\n", verifier.inst_visited);
+
+    FrameLayout frame_layout = {0};
+    frame_layout_init(&frame_layout, &ir_diags, &arena, &mod);
+    run_frame_layout(&frame_layout);
+
+    if (args.debug) print_frames(&frame_layout);
     
     // Free all memory
     free(tokens.data);

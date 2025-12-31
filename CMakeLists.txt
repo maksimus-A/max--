@@ -35,6 +35,10 @@ set(MAXC_SOURCES
     src/codegen/ir-gen/mir.c
     # IR verification
     src/codegen/backend/ir-verify/ir_verify.c
+    # Frame Layout
+    src/codegen/backend/frame-layout/arm64/frame_lay.c
+
+
     # IR walkers
     src/codegen/backend/ir_walkers.c
 

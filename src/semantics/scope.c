@@ -14,6 +14,7 @@
 
 // todo: modify to accommodate 'int x;'(solved?)
 
+// Adds symbol according to symbol_id.
 void add_symbol_to_table(Semantics* sema, Symbol* sym) {
     set_ptr_tbl(&sema->name_resolution, sym, sym->id);
 }
