@@ -29,8 +29,8 @@ static LIRBlock* get_curr_block_lir(LIRBuilder* builder, LIRFunction* func, Bloc
 }
 
 LIRInstruct* get_nth_instruction_lir(LIRBlock* block, int i) {
-    if (i >= block->lir_inst.count) return NULL;
-    return VEC_AT_PTR_T(&block->lir_inst, LIRInstruct, i);
+    if (i >= block->instructions.count) return NULL;
+    return VEC_AT_PTR_T(&block->instructions, LIRInstruct, i);
 }
 
 // Insert LIR instruction into LIR builder.
@@ -46,7 +46,7 @@ static bool lir_insert_instruction(LIRBuilder* lir_builder, LIRInstruct lir_inst
     // use macro to get pointer to current IRBlock element
     LIRBlock* b = get_curr_block_lir(lir_builder, f, block_id);
     // Add instruction to current block.
-    VEC_PUSH_T(&b->lir_inst, lir_inst);
+    VEC_PUSH_T(&b->instructions, lir_inst);
 
     return true;
 }
@@ -57,6 +57,7 @@ void lir_builder_init(LIRBuilder* builder, Arena* arena, Diagnostics* ir_diags, 
     builder->next_block_id.id = 0;
     builder->curr_func_index = SIZE_MAX;
     builder->curr_block_index = SIZE_MAX;
+    builder->curr_inst_index = SIZE_MAX;
 
 
     builder->ir_diags = ir_diags;
@@ -72,12 +73,15 @@ static void visit_func_begin(void* user, IRFunction* func) {
     LIRBuilder* builder = (LIRBuilder*)user;
 
     LIRFunction lir_func = {0};
+    // Set curr vreg_id to 0
+    lir_func.next_new_vreg = func->next_temp_id.id;
     // Create blocks vector
     VEC_INIT_T(&lir_func.blocks, builder->arena, LIRBlock);
 
     // Set function id
     lir_func.id = func->id;
     // lir_func.next_temp_id = (TempId) {.id=0};
+
 
     // push function into builder
     VEC_PUSH_T(&builder->lir_funcs, lir_func);
@@ -101,7 +105,7 @@ static void visit_block_begin(void* user, IRBlock* block) {
 
     builder->curr_block_index = block->id.id;
 
-    VEC_INIT_T(&lir_block.lir_inst, builder->arena, LIRInstruct);
+    VEC_INIT_T(&lir_block.instructions, builder->arena, LIRInstruct);
 
     LIRFunction* f = get_nth_func_lir(&builder->lir_funcs, builder->curr_func_index);
 
@@ -114,13 +118,21 @@ static void visit_block_end(void* user, IRBlock* block) {
 
 // ------ Conversion helpers ------
 
-// Creates a virtual register ID based on a temp ID.
-static VRegId create_vreg_id(TempId temp) {
+// Creates new vreg ID based on temp ID.
+static VRegId create_vreg_id(TempId temp_id) {
     VRegId vreg_id = (VRegId) {
-        .id = temp.id
+        .id = temp_id.id
     };
+
     return vreg_id;
     // todo: add to VRegInfo in IRModule. But currently temps don't store type info.
+}
+
+// Adds a new vreg without reference to a previous temp ID.
+static size_t add_new_vreg(LIRFunction* func) {
+    size_t new_vreg_id = func->next_new_vreg;
+    func->next_new_vreg++;
+    return new_vreg_id;
 }
 
 // Creates a FP/SP +- offset based on SlotId.
@@ -136,7 +148,8 @@ static Mem create_mem_info(SlotId* slot_id, IRModule* mod, size_t func_index) {
     return mem;
 }
 
-static LIRValue create_lir_value(IRValue ir_val) {
+// Checks if value in store is immediate or temp.
+static LIRValue create_lir_value(IRValue ir_val, LIRFunction* func) {
     LIRValue val = {0};
     val.value_type = ir_val.value_type;
     switch (ir_val.value_kind) {
@@ -157,18 +170,35 @@ static LIRValue create_lir_value(IRValue ir_val) {
     return val;
 }
 
+// Create 'const' op: Materializes immediate into a register
+static LIRInstruct materialize_imm(LIRBuilder* builder, int64_t imm, VRegId vreg_id) {
+    LIRConst lir_const = (LIRConst) {
+        .dst = vreg_id,
+        .src = imm
+    };
+
+    LIRInstruct inst = (LIRInstruct) {
+        .type = LIR_CONST,
+        .inst_num = builder->curr_inst_index,
+        .payload.const_payload = lir_const
+    };
+    return inst;
+}
+
 
 
 // Converts all MIR instructions into LIR instructions based on a 
 // few special rules.
 static void visit_instruct(void* user, IRInstruct* inst, BlockId block_id, FuncId func_id, size_t inst_index) {
     LIRBuilder* lir_builder = (LIRBuilder*)user;
+    LIRFunction* f = get_curr_func_lir(lir_builder, func_id);
 
     switch (inst->type) {
         case IR_LOAD:
         {
             // converts temps -> vregs
             // and slot -> fp +- offset
+
             VRegId vreg_id = create_vreg_id(inst->payload.load_payload.dst);
             Mem mem_info = create_mem_info(&inst->payload.load_payload.src, lir_builder->mod, func_id.id);
 
@@ -195,13 +225,27 @@ static void visit_instruct(void* user, IRInstruct* inst, BlockId block_id, FuncI
             // converts slot -> fp +- offset
             // and temp -> vreg
             Mem mem_info = create_mem_info(&inst->payload.store_payload.dst, lir_builder->mod, func_id.id);
-            // create lirval based off imm/temp.
-            LIRValue val = create_lir_value(inst->payload.store_payload.src);
 
+            VRegId vreg_id;
+            // if val is immediate, create materialization instruction
+            if (inst->payload.store_payload.src.value_kind == IRVAL_IMM) {
+                // Create new vreg for const instruction
+                vreg_id.id = add_new_vreg(f);
+                // Create const instruction
+                LIRInstruct const_inst = materialize_imm(lir_builder, inst->payload.store_payload.src.value_id.imm, vreg_id);
+                if (!lir_insert_instruction(lir_builder, const_inst, block_id, func_id)) {
+                    fprintf(stderr, "ERROR: Failed to insert 'Const' into LIR builder.");
+                    // todo*: insert into ir_diags.
+                }
+            }
+            else if (inst->payload.store_payload.src.value_kind == IRVAL_TEMP) {
+                vreg_id = create_vreg_id(inst->payload.store_payload.src.value_id.temp_id);
+            }
+            
             // Create payload
             LIRStore store = (LIRStore) {
                 .dst = mem_info,
-                .src = val
+                .src = vreg_id
             };
             // Create instruction
             LIRInstruct lir_inst = (LIRInstruct) {
@@ -218,7 +262,7 @@ static void visit_instruct(void* user, IRInstruct* inst, BlockId block_id, FuncI
         case IR_HALT:
         {
             // converts temp -> vreg
-            LIRValue code = create_lir_value(inst->payload.halt_payload.code);
+            LIRValue code = create_lir_value(inst->payload.halt_payload.code, f);
 
             // Create instruction payload
             LIRHalt halt = (LIRHalt) {
@@ -253,6 +297,9 @@ void run_lir_builder(LIRBuilder* lir_builder) {
 
 /*------ LIR PRINTING ------*/
 
+//todo: later add 'slot(id) after inst for debugging.
+// currently doesn't store that info anywhere in the instruction. :I
+
 static void print_mem(LIRBuilder* builder, Mem mem, FILE* output) {
     if (mem.base == LIR_BASE_FP) {
         fprintf(output, "[fp%d]", mem.offset);
@@ -270,6 +317,8 @@ static void print_instruction(LIRBuilder* builder, LIRInstruct* inst, FILE* outp
             LIRLoad load = inst->payload.load_payload;
             fprintf(output, "load r%zu, ", load.dst.id);
             print_mem(builder, load.src, output);
+
+            fprintf(output, "  ");
             break;
         }
         case LIR_STORE:
@@ -279,13 +328,14 @@ static void print_instruction(LIRBuilder* builder, LIRInstruct* inst, FILE* outp
             fprintf(output, "store ");
             print_mem(builder, store.dst, output);
             
-            if (store.src.value_kind == LIRVAL_IMM) {
-                fprintf(output, ", %lld", store.src.value_id.imm);
-            }
-            else if (store.src.value_kind == LIRVAL_VREG) {
-                fprintf(output, ", r%zu", store.src.value_id.vreg.id);
-            }
+            fprintf(output, ", r%zu", store.src.id);
             
+            break;
+        }
+        case LIR_CONST:
+        {
+            LIRConst cons = inst->payload.const_payload;
+            fprintf(output, "const r%zu, %lld", cons.dst.id, cons.src);
             break;
         }
         case LIR_HALT:
@@ -317,7 +367,7 @@ bool dump_lir(LIRBuilder* builder, FILE* output) {
             LIRBlock* b = get_nth_block_lir(f, j);
             fprintf(output, "block_%zu:\n", b->id.id);
 
-            for (int k = 0; k < b->lir_inst.count; k++) {
+            for (int k = 0; k < b->instructions.count; k++) {
                 fprintf(output, "    ");
                 LIRInstruct* instruction = get_nth_instruction_lir(b, k);
                 print_instruction(builder, instruction, output);

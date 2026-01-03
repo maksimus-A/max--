@@ -13,6 +13,7 @@
 typedef enum LIRInstructType {
     LIR_STORE,
     LIR_LOAD,
+    LIR_CONST,
     LIR_HALT // TODO: remove later for a terminator somehow.
 } LIRInstructType;
 
@@ -55,6 +56,7 @@ typedef enum LIRValueKind {
 } LIRValueKind;
 
 // Stores either an Immediate (literal) or a vreg.
+// todo: consider removing later? not sure
 typedef struct LIRValue {
     LIRValueKind value_kind;
     BuiltInType value_type;
@@ -69,13 +71,19 @@ typedef struct LIRValue {
 /* ------ Instruction payloads ------*/
 typedef struct LIRStore { 
     Mem dst;
-    LIRValue src;
+    VRegId src;
 } LIRStore;
 
 typedef struct LIRLoad { 
     VRegId dst;
     Mem src;
 } LIRLoad;
+
+// Materializes immediate into register.
+typedef struct LIRConst {
+    VRegId dst;
+    int64_t src;
+} LIRConst;
 
 // TODO: Refactor to 'return' once functions exist.
 typedef struct LIRHalt { // comes from exit(0), placeholder for 'return;'
@@ -92,6 +100,7 @@ typedef struct LIRInstruct {
         LIRStore store_payload;
         LIRLoad load_payload;
         LIRHalt halt_payload;
+        LIRConst const_payload;
     } payload;
 
     size_t inst_num;
@@ -101,7 +110,7 @@ typedef struct LIRInstruct {
 typedef struct LIRBlock {
     // list of instructions
     // Vector<LIRInstruct>
-    Vector lir_inst;
+    Vector instructions;
     BlockId id;
 } LIRBlock;
 
@@ -112,6 +121,8 @@ typedef struct LIRFunction {
 
     // todo: shouldn't need this; comes from MIR.
     //size_t next_slot_id;
+
+    size_t next_new_vreg; // for storing 'const' operation vregs, separate from temp ID vregs.
 
     // starting block in function
     BlockId entry;
@@ -134,6 +145,7 @@ typedef struct LIRBuilder {
     // used to index directly into vector when inserting instructions
     size_t curr_func_index;
     size_t curr_block_index;
+    size_t curr_inst_index;
 
     // Counters for creating unique IDs
     BlockId next_block_id;
@@ -144,7 +156,7 @@ typedef struct LIRBuilder {
     // diagnostics struct?
     Diagnostics* ir_diags;
 
-    // Source file (mostly for printing LIR)
+    // Source file (mostly for printing LIR)??
     Source* source_file;
 
     // IR module (useful tables)
@@ -153,6 +165,9 @@ typedef struct LIRBuilder {
     // FrameInfo (slotid -> FrameInfo table)
 } LIRBuilder;
 /* ------ LIR structs ------*/
+
+// LIR Visitor.
+
 
 void lir_builder_init(LIRBuilder* builder, Arena* arena, Diagnostics* ir_diags, IRModule* mod, Source* source_file);
 void run_lir_builder(LIRBuilder* lir_builder);
