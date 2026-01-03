@@ -33,7 +33,9 @@ static int align_up(size_t cursor, size_t align) {
 }
 
 // Calculates FP offsets of locals and total frame size.
+// todo: this should take into account FP/LR locations (and eventually callees).
 static void visit_func_begin(void* user, IRFunction* func) {
+
     FrameLayout* frame_lay = (FrameLayout*)user;
 
     // Init FrameInfo object

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define FP_ALIGN 16
+#define FP_ALIGN 16 // for ARM64
 
 typedef struct SlotFrameInfo {
     size_t size;

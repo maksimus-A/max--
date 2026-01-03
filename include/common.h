@@ -5,6 +5,9 @@
 
 #define START_BUFFER_SIZE 16
 
+// todo**: check if this works. IDK
+typedef struct FrameInfo FrameInfo;
+
 // TODO: Result should also return
 // a pointer to a struct I need? Right now
 // it's kinda useless, could just return int.
@@ -39,8 +42,12 @@ typedef struct SrcSpan {
 // backend analysis
 typedef struct IRModule{
     // todo: initialize all ptr tables/IRModule
+    // funcs == MIR functions.
     Vector* funcs;
     PtrTable* slot_type; // slot_id -> symbol type
+    // todo: below is uninitialized.
+    FrameInfo* frames; // filled after frame_info pass. // todo: add from frame_layout pass.
+    PtrTable* VRegInfo; // vregid-> vreg size,type // todo: add in LIR_gen
     PtrTable* temp_inst; // tempid -> instruction
     PtrTable* name_resolution; // slot_id -> symbol
 } IRModule;

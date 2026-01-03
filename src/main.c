@@ -1,4 +1,5 @@
 #include "codegen/backend/ir-verify/ir_verify.h"
+#include "codegen/backend/lir/arm64/lir.h"
 #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
 #include "arena/arena_test.h"
 #endif
@@ -208,11 +209,22 @@ int main(int argc, char **argv) {
 
     if (args.debug) fprintf(stdout, "\nIR Verifier: Instructions visited: %zu\n", verifier.inst_visited);
 
+    // Frame layout pass
     FrameLayout frame_layout = {0};
     frame_layout_init(&frame_layout, &ir_diags, &arena, &mod);
     run_frame_layout(&frame_layout);
 
     if (args.debug) print_frames(&frame_layout);
+
+    // Insert frames created into IRModule
+    mod.frames = frame_layout.frames;
+
+    // Lower IR generation pass
+    LIRBuilder lir_builder = {0};
+    lir_builder_init(&lir_builder, &arena, &ir_diags, &mod, &source_file);
+    run_lir_builder(&lir_builder);
+
+    if (args.debug) dump_lir(&lir_builder, stdout);
     
     // Free all memory
     free(tokens.data);

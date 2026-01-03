@@ -22,6 +22,7 @@
 typedef enum IRInstructType {
     IR_STORE,
     IR_LOAD,
+    // todo: move this to IRTerminator list.
     IR_HALT // terminates program with status code. (currently exit(0))
     // no instructions allowed after exit.
 } IRInstructType;

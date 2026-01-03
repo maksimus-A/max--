@@ -26,3 +26,6 @@ void ir_walk_func_linear(IRVisitor* visitor, void* user, Vector* funcs) {
         visitor->visit_func_end(user, f);
     }
 }
+
+// todo: eventually make an lir walker for emitting
+// actual code. can use above for lir gen!
