@@ -125,7 +125,7 @@ static bool is_infix(Token token) {
         case PLUS:
         case MINUS:
         case LESS_THAN:
-        case EQ:
+        case EQQ:
         case NEQ:
             return true;
         default:
@@ -148,7 +148,7 @@ static int precedence(Token token) {
             return 19;
         case LESS_THAN:
             return 18;
-        case EQ:
+        case EQQ:
         case NEQ:
             return 17;
         default:

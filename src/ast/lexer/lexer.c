@@ -182,8 +182,17 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
             case '=':
                 {
                     // TODO: Consider '==' as well.
-                    Token token = set_token(EQ, i, line, col, 1);
-                    push_token(tokens, token);
+                    if (i + 1 < source_file->length) {
+                        if (source_file->buffer[i+1] == '=') {
+                            Token token = set_token(EQQ, i, line, col, 2);
+                            push_token(tokens, token);
+                            i++;
+                        }
+                        else {
+                            Token token = set_token(EQ, i, line, col, 1);
+                            push_token(tokens, token);
+                        }
+                    }
                 }
                 break;
             case ';':
@@ -260,8 +269,17 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                     col = 0;
                 }
                 break;
-
-
+            case '!':
+                {
+                    if (i < source_file->length-1) {
+                        if (source_file->buffer[i+1] == '=') {
+                            Token token = set_token(NEQ, i, line, col, 2);
+                            push_token(tokens, token);
+                            i++;
+                        }
+                    }
+                }
+                break;
             default:
                 if (isdigit((unsigned char)c)) {
                     int length = get_digit_length(source_file->buffer, i);

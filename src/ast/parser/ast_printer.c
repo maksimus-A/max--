@@ -18,7 +18,7 @@ const char* op_string[TOK_COUNT] = {
     [MINUS] = "-",
     [MULT] = "*",
     [DIV] = "/",
-    [EQ] = "==",
+    [EQQ] = "==",
     [NEQ] = "!=",
     [LESS_THAN] = "<"
 };
