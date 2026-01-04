@@ -8,6 +8,10 @@ Right now I'm focusing on max-1, a simple, minimal language spec I can use to he
 
 The language will only compile to ARM64 for mac. I could have used LLVM as my target but I wanted to also learn about the backend compilation process.
 
+## Update:
+I don't know if I can bootstrap. I chose to implement the backend myself. What a world of pain I was not ready for. Had I used LLVM
+maybe bootstrapping was feasible but now I'm not so sure. max-1 might be it for this. :(
+
 ## Current Progress
 
 Currently supports:
@@ -20,6 +24,7 @@ Frontend:
 
 Backend:
 - Currently working on. Learning about how backends work in general.
+- Made an IR verification pass, frame layout pass, and LIR generation pass. Will do codegen pass, and consider doing 1-2 optimization passes later. Also will probably do register allocation at some point. Then I think I'm done with this for a bit.
 
 Lots of fixes in the making; will refactor error handling of parsing. I chose ARM64 now instead of x86.
 

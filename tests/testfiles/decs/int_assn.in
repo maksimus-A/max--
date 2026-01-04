@@ -2,4 +2,8 @@ int x = 1;
 int y = 2;
 x = y;
 y = 3;
-exit(x); 
+{
+    int x = 3;
+    x = 5;
+}
+exit(x);

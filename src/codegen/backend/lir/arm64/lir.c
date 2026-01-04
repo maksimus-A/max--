@@ -357,6 +357,7 @@ static void print_instruction(LIRBuilder* builder, LIRInstruct* inst, FILE* outp
 
 bool dump_lir(LIRBuilder* builder, FILE* output) {
     // Goes through all instructions and prints accordingly
+    fprintf(output, "\n------ LIR Generation ------\n");
     size_t block_index = 0;
     for (int i = 0; i < builder->lir_funcs.count; i++) {
         LIRFunction* f = get_nth_func_lir(&builder->lir_funcs, i);

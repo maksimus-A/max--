@@ -9,3 +9,6 @@ bin/
 .VSCodeCounter/
 
 entire-workspace.txt
+
+mx_out.s
+mx_out.out

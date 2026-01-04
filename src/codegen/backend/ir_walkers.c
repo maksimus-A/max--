@@ -27,5 +27,27 @@ void ir_walk_func_linear(IRVisitor* visitor, void* user, Vector* funcs) {
     }
 }
 
-// todo: eventually make an lir walker for emitting
-// actual code. can use above for lir gen!
+/* ------ LIR ------ */
+
+// LIR: Walk all functions, blocks, and instructions
+// linearly (in vector order).
+void lir_walk_func_linear(LIRVisitor* visitor, void* user, Vector* funcs) {
+
+    for (size_t i = 0; i < funcs->count; i++) {
+        LIRFunction* f = get_nth_func_lir(funcs, i);
+
+        visitor->visit_func_begin(user, f);
+        for (size_t j = 0; j < f->blocks.count; j++) {
+            LIRBlock* b = get_nth_block_lir(f, j);
+
+            visitor->visit_block_begin(user, b);
+            for (size_t k = 0; k < b->instructions.count; k++) {
+                LIRInstruct* instruction = get_nth_instruction_lir(b, k);
+
+                visitor->visit_instruct(user, instruction, b->id, f->id, k);
+            }
+            visitor->visit_block_end(user, b);
+        }
+        visitor->visit_func_end(user, f);
+    }
+}

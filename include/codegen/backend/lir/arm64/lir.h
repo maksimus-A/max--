@@ -17,6 +17,7 @@ typedef enum LIRInstructType {
     LIR_HALT // TODO: remove later for a terminator somehow.
 } LIRInstructType;
 
+// unused.
 typedef enum LIRTerminator {
     LIR_TERM_RETURN,
     LIR_TERM_UBR, // unconditional branch

@@ -1,3 +1,4 @@
+#include "codegen/backend/arm64-gen/emitter.h"
 #include "codegen/backend/ir-verify/ir_verify.h"
 #include "codegen/backend/lir/arm64/lir.h"
 #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
@@ -35,17 +36,19 @@
 typedef struct Args Args;
 struct Args {
     char* input_path;
-    char* output_path;
+    char* output_assm_path;
     short error_code;
     short debug;
+    bool gen_assm_file;
 };
 
 Args parse_args(int argc, char **argv) {
     Args args;
     args.input_path = NULL;
-    args.output_path = NULL;
+    args.output_assm_path = NULL;
     args.error_code = 0;
     args.debug = 0;
+    args.gen_assm_file = false;
 
     if (argc < 2) {
         fprintf(stderr, "Usage: %s file.m\n [-debug]", argv[0]);
@@ -59,11 +62,19 @@ Args parse_args(int argc, char **argv) {
                 args.debug = 1;
             }
             /* handle other flags as needed */
+            if (argv[i][1] == 'S') { // gen assembly flag
+                args.gen_assm_file = true;
+            }
         }
     }
     // TODO: Ensure valid input path, check for output path, etc
     args.error_code = 0;
     return args;
+}
+
+FILE* create_assm_file(const char* name) {
+    FILE* assm = fopen(name, "w");
+    return assm;
 }
 
 
@@ -225,6 +236,19 @@ int main(int argc, char **argv) {
     run_lir_builder(&lir_builder);
 
     if (args.debug) dump_lir(&lir_builder, stdout);
+    fprintf(stdout, "\n\n\n");
+
+    // Final pass. Generate ARM64 only (for now at least).
+    ARMEmitter emitter = {0};
+    // Debugging; should just find the name based on input name.
+    const char* name = "mx_out.s";
+    FILE* assm = create_assm_file(name);
+    if (assm == NULL) {
+        fprintf(stderr, "Failed to create assembly file.");
+        return 6;
+    }
+    arm_emitter_init(&emitter, assm, &lir_builder.lir_funcs, &mod, &ir_diags);
+    run_arm_emitter(&emitter);
     
     // Free all memory
     free(tokens.data);

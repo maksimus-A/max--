@@ -39,6 +39,8 @@ set(MAXC_SOURCES
     src/codegen/backend/frame-layout/arm64/frame_lay.c
     # LIR generation
     src/codegen/backend/lir/arm64/lir.c
+    # ARM assembly generation
+    src/codegen/backend/arm64-gen/emitter.c
 
 
     # IR walkers
