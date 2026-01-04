@@ -2,6 +2,7 @@
 #include "errors/diagnostics.h"
 #include "semantics/def-assn-analysis/def_assn.h"
 #include "semantics/walker.h"
+#include <assert.h>
 #include <stdalign.h>
 #include <stdint.h>
 #include <string.h>
@@ -37,6 +38,15 @@ bool check_proper_assignment_to_var(DefAssn* defassn, ASTNode* child_expr) {
                 "Symbol '%.*s' was not assigned/initialized before use.", defassn->source_file);
             return false;
         }
+    }
+    else if (child_expr->ast_kind == AST_BIN_OP) {
+        ASTNode* LHS = child_expr->node_info.bin_op.LHS;
+        ASTNode* RHS = child_expr->node_info.bin_op.RHS;
+        // todo: better error handling.
+        assert(LHS != NULL);
+        assert(RHS != NULL);
+        if (!check_proper_assignment_to_var(defassn, LHS)) return false;
+        if (!check_proper_assignment_to_var(defassn, RHS)) return false;
     }
     return true;
 }
@@ -79,6 +89,18 @@ void def_assn_pre(void* user, ASTNode* node) {
 
             size_t var_id = node->node_info.assn_stmt.resolved_sym->id;
             assign_variable(defassn->assigned, var_id);
+
+            break;
+        }
+        case AST_BIN_OP:
+        {
+            ASTNode* LHS = node->node_info.bin_op.LHS;
+            ASTNode* RHS = node->node_info.bin_op.RHS;
+            if (LHS == NULL || RHS == NULL) break;
+
+            // todo: recurse on the bin_ops until we get to names.
+            if (!check_proper_assignment_to_var(defassn, LHS)) break;
+            if (!check_proper_assignment_to_var(defassn, RHS)) break;
 
             break;
         }

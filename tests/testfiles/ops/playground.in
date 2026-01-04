@@ -1,5 +1,6 @@
-int x = 1;
+int x = 6;
 int y = 2;
-int i = (x + y) * (x - y) / (x*y + (z));
+int z = 8;
+int i = (x + y) * (x - y) / (x*y-(x-y)); // 8 * 4 / (12-4) = 32/8 = 4
 
 exit(x*y*i);

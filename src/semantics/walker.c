@@ -120,6 +120,13 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
             }
             break;
         }
+        case AST_BIN_OP:
+        {
+            ASTNode* LHS = node->node_info.bin_op.LHS;
+            ASTNode* RHS = node->node_info.bin_op.RHS;
+            walk_node(visitor, user, LHS);
+            walk_node(visitor, user, RHS);
+        }
         case AST_INT_LIT:
         {
             // No idea because there's no children.
