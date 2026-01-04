@@ -15,6 +15,7 @@ typedef enum ASTKind {
     AST_ASSN,
     AST_BLOCK,
     AST_EXIT,
+    AST_BIN_OP, // binary operators
     AST_ERROR
 } ASTKind;
 
@@ -78,6 +79,13 @@ typedef struct BlockInfo {
     NodeList body;
 } BlockInfo;
 
+// Binary operators
+typedef struct BinaryOperator {
+    Token operator;
+    ASTNode* LHS;
+    ASTNode* RHS;
+}BinOp;
+
 //Built-ins
 // Exit
 typedef struct ExitInfo {
@@ -85,7 +93,6 @@ typedef struct ExitInfo {
     ASTNode* expr;
 } ExitInfo;
 
-// Expressions?
 
 /*------- AST STRUCTS -------*/
 typedef struct ASTNode {
@@ -102,6 +109,7 @@ typedef struct ASTNode {
         BlockInfo block_info;
         ExitInfo exit_info;
         AssnStmtInfo assn_stmt;
+        BinOp bin_op;
     } node_info;
 } ASTNode;
 

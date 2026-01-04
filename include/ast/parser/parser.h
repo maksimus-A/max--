@@ -20,6 +20,15 @@ struct Parser {
     size_t error_list_size;
 };
 
+typedef enum OperatorPrescedence {
+    OP_PAREN,
+    OP_MULT_DIV_MOD, // * / %
+    OP_ADD_SUB, // + -
+    OP_EQ, // ==
+    OP_NEQ, // !=
+    OP_COUNT
+} OpPres;
+
 ASTNode* build_ast(Parser* parser, Source* source_file);
 int initialize_parser(Parser* parser, Arena* arena, TokenBuffer* tokens, Diagnostics* diags);
 int free_ast_arena(Parser* parser);

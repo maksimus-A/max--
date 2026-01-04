@@ -13,6 +13,16 @@ char* built_in_type_string[TYPE_TOTAL_COUNT] = {
     /*TYPE_CHAR*/        "char",
 };
 
+const char* op_string[TOK_COUNT] = {
+    [PLUS] = "+",
+    [MINUS] = "-",
+    [MULT] = "*",
+    [DIV] = "/",
+    [EQ] = "==",
+    [NEQ] = "!=",
+    [LESS_THAN] = "<"
+};
+
 char* get_type_string(BuiltInType type) {
     return built_in_type_string[type];
 }
@@ -50,7 +60,6 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         }
         case AST_VAR_DEC: 
         {
-            // TODO: Check if is 'int x;' or 'int x = 0;'
             char* start_ptr = start_of_name(node->node_info.var_decl.name_span, source_file);
 
             printf("VarDecl id={%d} type={%s} name={", (int)node->id, get_type_string(node->node_info.var_decl.type));
@@ -68,20 +77,18 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
 
             break;
         }
-        case AST_INT_LIT: // leaf
+        case AST_BIN_OP:
         {
-            IntLitInfo int_lit = node->node_info.int_lit;
-            printf("IntLit id={%d} %ld", (int)node->id, int_lit.value);
+            printf("BinOp id={%zu} operator={%s", node->id, op_string[node->node_info.bin_op.operator.token_kind]);
+            printf("}\n");
+            indent++;
+            // Print LHS/RHS
+            dump_ast(node->node_info.bin_op.LHS, source_file, indent);
+            dump_ast(node->node_info.bin_op.RHS, source_file, indent);
+            indent--;
+            print_indentation(indent);
             printf(")\n");
-            break;
-        }
-        case AST_NAME: // leaf
-        {
-            printf("VarName id={%d} name={", (int)node->id);
 
-            char* start_ptr = start_of_name(node->node_info.var_name.name_span, source_file);
-            print_file_slice(start_ptr, node->node_info.var_name.name_span.length, stdout);
-            printf("})\n");
             break;
         }
         case AST_BLOCK:
@@ -120,6 +127,22 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             print_indentation(indent);
             printf(")\n");
             
+        }
+        case AST_INT_LIT: // leaf
+        {
+            IntLitInfo int_lit = node->node_info.int_lit;
+            printf("IntLit id={%d} %ld", (int)node->id, int_lit.value);
+            printf(")\n");
+            break;
+        }
+        case AST_NAME: // leaf
+        {
+            printf("VarName id={%d} name={", (int)node->id);
+
+            char* start_ptr = start_of_name(node->node_info.var_name.name_span, source_file);
+            print_file_slice(start_ptr, node->node_info.var_name.name_span.length, stdout);
+            printf("})\n");
+            break;
         }
         default:
             break;

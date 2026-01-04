@@ -24,11 +24,12 @@ const char* ret_reg = "x0"; // return register
 const char* LR = "x30"; // link register
 const char* epilogue_name = ".Lreturn_func"; // todo: always add func_id
 const char* _main = "_main";
+const char* NO_RA = "ERROR: RA not implemented; more than 7 virtual registers allocated.";
 
 static bool check_vregs_size(size_t vreg_id) {
     if (vreg_id >= PREGS_SIZE) {
         // todo: add to ir diags.
-        fprintf(stderr, "ERROR: RA not implemented; more than 7 virtual registers allocated.");
+        fprintf(stderr, "%s (%zu made).\n", NO_RA, vreg_id);
         return false;
     }
     return true;

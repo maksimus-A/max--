@@ -41,7 +41,7 @@ enum TokenKind {
     MINUS,
     MULT,
     DIV,
-    EQ,
+    EQ, // ==
     NEQ,
     LESS_THAN,
 

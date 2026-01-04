@@ -26,7 +26,8 @@ Backend:
 - Currently working on. Learning about how backends work in general.
 - Made an IR verification pass, frame layout pass, and LIR generation pass. Will do codegen pass, and consider doing 1-2 optimization passes later. Also will probably do register allocation at some point. Then I think I'm done with this for a bit.
 
-- Can correctly emit ARM64 for declarations and assignments. You can see exit code output using `./assm.sh`.
+- Can correctly emit ARM64 for declarations and assignments. 
+    - First, run the maxc binary to compile your code into a .s file. Then, you can see exit code output using `./assm.sh`.
 
 Lots of fixes in the making; will refactor error handling of parsing. I chose ARM64 now instead of x86.
 

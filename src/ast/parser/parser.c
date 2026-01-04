@@ -115,6 +115,51 @@ int match_one_of_kinds(Parser* parser, enum TokenKind* kind, int size) {
     return 0;
 }
 
+// Pratt parsing helpers
+
+// Returns true if operator is an infix operator.
+static bool is_infix(Token token) {
+    switch (token.token_kind) {
+        case MULT:
+        case DIV:
+        case PLUS:
+        case MINUS:
+        case LESS_THAN:
+        case EQ:
+        case NEQ:
+            return true;
+        default:
+            return false;
+    }
+    return false;
+}
+
+// Returns the precedence of the operator token.
+static int precedence(Token token) {
+    switch (token.token_kind) {
+        case PAREN_START:
+        case PAREN_END:
+            return 25;
+        case MULT:    
+        case DIV:
+            return 20;
+        case PLUS:
+        case MINUS:
+            return 19;
+        case LESS_THAN:
+            return 18;
+        case EQ:
+        case NEQ:
+            return 17;
+        default:
+        {
+            fprintf(stdout, "No prescedence associated with this token.");
+            return -1;
+            break;
+        }
+    }
+}
+
 /*--------- VISIT_[NODE] --------- */
 
 
@@ -248,11 +293,13 @@ long get_int_lit_value(Parser* parser, Source* source_file) {
 }
 
 /*--------- PARSE_{NODE} ---------*/
-// parses expression, moves pointer to end of expr.
-// Assumes pointer is at start of expression.
-ASTNode* parse_expr(Parser* parser, Source* source_file) {
+
+// Parses LHS of expression.
+ASTNode* parse_primary(Parser* parser, Source* source_file) {
+
     ASTNode* expr = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
 
+    // First get LHS (prefix/primary)
     if (current(parser).token_kind == INT_LITERAL) {
         // todo: parse -(unary op)
         expr->ast_kind = AST_INT_LIT;
@@ -264,7 +311,6 @@ ASTNode* parse_expr(Parser* parser, Source* source_file) {
         advance(parser);
     }
     else if (current(parser).token_kind == IDENTIFIER) {
-        // TODO: Check entirety of expression.
         // For now we'll focus on single identifiers on RHS.
         expr->ast_kind = AST_NAME;
         expr->id = parser->curr_id;
@@ -277,9 +323,52 @@ ASTNode* parse_expr(Parser* parser, Source* source_file) {
         expr->ast_kind = AST_ERROR;
         add_err_msg(parser, "Could not parse expression.", current(parser).line, current(parser).col);
     }
-    // TODO: Parse real expressions, not just integer literals.
+    // TODO: Parse parentheses, and unary ops.
 
     return expr;
+}
+
+// parses expression, moves pointer to end of expr.
+// Assumes pointer is at start of expression.
+// todo: add error handling.
+ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
+    // Get LHS of binary expression (if it exists), and consume.
+    ASTNode* LHS = parse_primary(parser, source_file);
+    if (LHS->ast_kind == AST_ERROR) return NULL;
+
+    while (is_infix(current(parser)) && precedence(current(parser)) >= min_prec) {
+        Token op = current(parser);
+        int new_min_prec = precedence(op) + 1;
+
+        advance(parser); // consume op
+        ASTNode* RHS = parse_expr(parser, source_file, new_min_prec);
+        if (RHS->ast_kind == AST_ERROR) return NULL;
+
+        // Make binop info
+        BinOp bin_op = (BinOp) {
+            .LHS = LHS,
+            .RHS = RHS,
+            .operator = op
+        };
+        // Find span of binop
+        SrcSpan bin_span = create_span_from(LHS->span.start, RHS->span.start + RHS->span.length);
+
+        // Create binary expression
+        ASTNode* new_lhs = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+        new_lhs->ast_kind = AST_ERROR;
+
+        // Create binary expression node
+        *new_lhs= (ASTNode) {
+            .ast_kind = AST_BIN_OP,
+            .id = parser->curr_id,
+            .node_info.bin_op = bin_op,
+            .span = bin_span
+        };
+        parser->curr_id++;
+        LHS = new_lhs;
+    }
+
+    return LHS;
 }
 
 ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
@@ -312,7 +401,8 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
     ASTNode* expr_node;
     // Check type of declaration (assignment or pure decl)
     if (match_kind(parser, EQ)) {
-        expr_node = parse_expr(parser, source_file);
+        int precedence = 0;
+        expr_node = parse_expr(parser, source_file, precedence);
     }
     else if (current(parser).token_kind == SEMICOLON) {
         // i'll check if this is null to see if it was a
@@ -383,7 +473,9 @@ ASTNode* parse_exit(Parser* parser, Source* source_file) {
     char* err_msg = alloc_error_ptr(parser);
     expect(parser, PAREN_START, err_msg);
 
-    ASTNode* expr = parse_expr(parser, source_file);
+    ASTNode* expr = parse_expr(parser, source_file, 0);
+    if (expr->ast_kind == AST_ERROR) return NULL; // todo: error handle better.
+
     exit_node->node_info.exit_info.expr = expr;
 
     // Pointer is after expression now
@@ -419,7 +511,7 @@ ASTNode* parse_assn(Parser* parser, Source* source_file) {
 
     // ptr at expr
     if (expect(parser, EQ, err_msg)) {
-        ASTNode* expr_node = parse_expr(parser, source_file);
+        ASTNode* expr_node = parse_expr(parser, source_file, 0);
         // todo: check name span is correct
         assn_stmt->node_info.assn_stmt = (struct AssnStmtInfo){
             .name_span = name_span,
