@@ -1,6 +1,5 @@
 int x = 1;
 int y = 2;
-int i = x + y * 3;
-int j = 1 != 2 * i + x;
+int i = (x + y) * (x - y) / (x*y + (z));
 
 exit(x*y*i);

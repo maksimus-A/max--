@@ -15,6 +15,7 @@
 // todo: refactor all errors to just use 'Diagnostics'
 void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond);
 char* alloc_error_ptr(Parser* parser);
+ASTNode* parse_expr(Parser* paresr, Source* source_file, int min_prec);
 
 /*--------- HELPERS --------- */
 // Checkers
@@ -319,6 +320,15 @@ ASTNode* parse_primary(Parser* parser, Source* source_file) {
             parser->tokens->data[parser->token_index].start + parser->tokens->data[parser->token_index].length);
         advance(parser);
     }
+    else if (current(parser).token_kind == PAREN_START) {
+        advance(parser);
+        expr = parse_expr(parser, source_file, 0);
+        char* err_msg = alloc_error(parser->diags);
+        if (!expect(parser, PAREN_END, err_msg)) {
+            add_diag(parser->diags, ERROR, (SrcSpan){.length=current(parser).length, .start=current(parser).start}, 
+                err_msg, current(parser).line, current(parser).col);
+        }
+    }
     else { // error
         expr->ast_kind = AST_ERROR;
         add_err_msg(parser, "Could not parse expression.", current(parser).line, current(parser).col);
@@ -328,7 +338,7 @@ ASTNode* parse_primary(Parser* parser, Source* source_file) {
     return expr;
 }
 
-// parses expression, moves pointer to end of expr.
+// Pratt parses expression, moves pointer to end of expr.
 // Assumes pointer is at start of expression.
 // todo: add error handling.
 ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
@@ -338,7 +348,7 @@ ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
 
     while (is_infix(current(parser)) && precedence(current(parser)) >= min_prec) {
         Token op = current(parser);
-        int new_min_prec = precedence(op) + 1;
+        int new_min_prec = precedence(op) + 1; // only for left-assoc. right should just be prec(op)
 
         advance(parser); // consume op
         ASTNode* RHS = parse_expr(parser, source_file, new_min_prec);

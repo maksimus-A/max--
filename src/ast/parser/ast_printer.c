@@ -126,7 +126,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             indent--;
             print_indentation(indent);
             printf(")\n");
-            
+            break;
         }
         case AST_INT_LIT: // leaf
         {
@@ -145,7 +145,10 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             break;
         }
         default:
+        {
+            printf("ERROR: Couldn't find AST node.");
             break;
+        }
     }
 }
 
