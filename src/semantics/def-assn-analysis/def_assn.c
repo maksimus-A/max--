@@ -27,106 +27,45 @@ void assign_variable(uint64_t* assigned, size_t var_id) {
     assigned[word_index] |= mask;
 }
 
-// Check if expr references a var, and if assigned[var] == 0.
-// True if assignment is to an intitialized var.
-bool check_proper_assignment_to_var(DefAssn* defassn, ASTNode* child_expr) {
-    if (child_expr->ast_kind == AST_NAME) {
-        size_t child_expr_id = child_expr->node_info.var_name.resolved_sym->id;
-        if (!is_assigned(defassn->assigned, child_expr_id)) {
-            SrcSpan var_span = child_expr->node_info.var_name.name_span;
-            create_and_add_diag_fmt(defassn->diags, ERROR, var_span, 
-                "Symbol '%.*s' was not assigned/initialized before use.", defassn->source_file);
-            return false;
-        }
-    }
-    else if (child_expr->ast_kind == AST_BIN_OP) {
-        ASTNode* LHS = child_expr->node_info.bin_op.LHS;
-        ASTNode* RHS = child_expr->node_info.bin_op.RHS;
-        // todo: better error handling.
-        assert(LHS != NULL);
-        assert(RHS != NULL);
-        if (!check_proper_assignment_to_var(defassn, LHS)) return false;
-        if (!check_proper_assignment_to_var(defassn, RHS)) return false;
-    }
-    return true;
-}
 
 void def_assn_pre(void* user, ASTNode* node) {
     DefAssn* defassn = (DefAssn*)user;
 
     switch (node->ast_kind) {
-        case AST_PROGRAM:
-        {
-
-            break;
-        }
-        case AST_BLOCK:
-        {
-            break;
-        }
-        case AST_VAR_DEC: 
-        {
-            // Only set to 1 if it has a RHS.
-            ASTNode* child_expr = node->node_info.var_decl.init_expr;
-            if (child_expr == NULL) break;
-            // todo: this becomes much more complex if the expr is a long evaluation.
-            // Check if expr references a var, and if assigned[var] == 0
-            if (!check_proper_assignment_to_var(defassn, child_expr)) break;
-
-            size_t var_id = node->node_info.var_decl.symbol->id;
-            assign_variable(defassn->assigned, var_id);
-
-            break;
-        }
-        case AST_ASSN:
-        {
-            // Only set to 1 if it has a RHS.
-            ASTNode* child_expr = node->node_info.assn_stmt.init_expr;
-            if (child_expr == NULL) break;
-            // todo: this becomes much more complex if the expr is a long evaluation.
-            // Check if expr references a var, and if assigned[var] == 0
-            if (!check_proper_assignment_to_var(defassn, child_expr)) break;
-
-            size_t var_id = node->node_info.assn_stmt.resolved_sym->id;
-            assign_variable(defassn->assigned, var_id);
-
-            break;
-        }
-        case AST_BIN_OP:
-        {
-            ASTNode* LHS = node->node_info.bin_op.LHS;
-            ASTNode* RHS = node->node_info.bin_op.RHS;
-            if (LHS == NULL || RHS == NULL) break;
-
-            // todo: recurse on the bin_ops until we get to names.
-            if (!check_proper_assignment_to_var(defassn, LHS)) break;
-            if (!check_proper_assignment_to_var(defassn, RHS)) break;
-
-            break;
-        }
         case AST_NAME:
         {
-
+            size_t child_expr_id = node->node_info.var_name.resolved_sym->id;
+            if (!is_assigned(defassn->assigned, child_expr_id)) {
+                SrcSpan var_span = node->node_info.var_name.name_span;
+                create_and_add_diag_fmt(defassn->diags, ERROR, var_span, 
+                    "Symbol '%.*s' was not assigned/initialized before use.", defassn->source_file);
+            }
             break;
         }
-        case AST_EXIT:
-        {
-            // Only set to 1 if it has a RHS.
-            ASTNode* child_expr = node->node_info.exit_info.expr;
-            if (child_expr == NULL) break;
-            // todo: this becomes much more complex if the expr is a long evaluation.
-            // Check if expr references a var, and if assigned[var] == 0
-            if (!check_proper_assignment_to_var(defassn, child_expr)) break;
-
-            break;
-        }
-
         default: break;
     }
 }
 
 void def_assn_post(void* user, ASTNode* node) {
     DefAssn* defassn = (DefAssn*)user;
+    
+    switch (node->ast_kind) {
+        case AST_VAR_DEC: 
+        {
+            if (node->node_info.var_decl.init_expr != NULL) {
+                size_t var_id = node->node_info.var_decl.symbol->id;
+                assign_variable(defassn->assigned, var_id);
+            }
+            break;
+        }
+        case AST_ASSN:
+        {
+            size_t var_id = node->node_info.assn_stmt.resolved_sym->id;
+            assign_variable(defassn->assigned, var_id);
+            break;
+        }
+        default: break;
+    }
     
     if (defassn->debug) dump_assigned_bits(defassn);
 }
