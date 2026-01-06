@@ -576,5 +576,6 @@ bool dump_mir(IRBuilder* builder, FILE* output) {
             }
         }
     }
+    fprintf(output, "\n");
     return true;
 }

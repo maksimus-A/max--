@@ -20,16 +20,21 @@ static inline int is_whitespace_char(char c) {
     return c == '\n' || c == ' ' || c == '\t';
 }
 
+static inline int is_div_op(char* buf, int i) {
+    return ((buf[i+1] != '/' && buf[i+1] != '*'));
+}
+
 static inline int is_comment_or_div_starter(char* buf, int i) {
     // For both single/multi-line and division op
     if (buf[i] == '/') {
-        return (buf[i+1] == '/' || buf[i+1] == '*' || is_whitespace_char(buf[i+1]));
+        return (buf[i+1] == '/' || buf[i+1] == '*' || is_div_op(buf, i));
     }
     return 0;
 }
 
 static inline int is_sl_comment(char* buf, int i) {
-    return buf[i+1] == '/';
+    if (buf[i] != '\0') return buf[i+1] == '/';
+    return 0; 
 }
 
 static inline int is_ml_comment(char* buf, int i) {
@@ -41,9 +46,7 @@ static inline int is_ml_comment(char* buf, int i) {
     return 0;
 }
 
-static inline int is_div_op(char* buf, int i) {
-    return is_whitespace_char(buf[i+1]);
-}
+
 
 static enum TokenKind get_keyword(char* buf, int i, int length) {
     enum TokenKind token_kind = IDENTIFIER;
@@ -95,7 +98,7 @@ static int get_ml_comment_len(char* buf, int i) {
     // Moves index pointer to after the comment.
     int start = i;
     while (buf[i] != '\0')  {
-        if (buf[i] == '*' && buf[i+1] == '/') return i+1-start;
+        if (buf[i] == '*' && buf[i+1] == '/') return i+2-start;
         i++;
     }
     return i - start;

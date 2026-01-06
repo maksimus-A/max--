@@ -1,9 +1,22 @@
+/*
 int x = 6;
 int y = 2;
 int z = 8;
 
-int i = (x + y * z) / x;    // 6 + (2*8) / 2 = (6 + 16) / 2 = 22 / 2 = 11
-exit(i); // ret 11
+int i = (z) * (x - y) / (x*y-(x-y)); // 8 * 4 / (12-4) = 32/8 = 4
+exit(x*y*i); */
 
-//int i = (z) * (x - y) / (x*y-(x-y)); // 8 * 4 / (12-4) = 32/8 = 4
-//exit(x*y*i);
+
+int x = 8;
+int y = 3;
+int z = 5;
+
+int r = x*y - z*(x - y/z) + (x - y)*(z - x/y);
+exit(r);
+
+
+
+
+// int i = (x + y * z) / x;    // 6 + (2*8) / 2 = (6 + 16) / 2 = 22 / 2 = 11
+// exit(i); // ret 11
+
