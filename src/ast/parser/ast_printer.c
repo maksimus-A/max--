@@ -79,7 +79,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         }
         case AST_BIN_OP:
         {
-            printf("BinOp id={%zu} operator={%s", node->id, op_string[node->node_info.bin_op.operator.token_kind]);
+            printf("BinOp id={%zu} operator={%s", node->id, op_string[node->node_info.bin_op.op.token_kind]);
             printf("}\n");
             indent++;
             // Print LHS/RHS

@@ -12,3 +12,6 @@ entire-workspace.txt
 
 mx_out.s
 mx_out.out
+
+src/codegen/backend_c
+include/codegen/backend_c

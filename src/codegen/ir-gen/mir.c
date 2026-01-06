@@ -143,7 +143,7 @@ IRValue get_ir_value_stack(IRBuilder* builder) {
 // Gets BinOp kind based on token type.
 static BinOpKind get_binop_kind(ASTNode* node) {
 
-    Token op = node->node_info.bin_op.operator;
+    Token op = node->node_info.bin_op.op;
     switch (op.token_kind) {
         case PLUS: return BIN_ADD;
         case MINUS: return BIN_SUB;

@@ -358,7 +358,7 @@ ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
         BinOpInfo bin_op = (BinOpInfo) {
             .LHS = LHS,
             .RHS = RHS,
-            .operator = op
+            .op = op
         };
         // Find span of binop
         SrcSpan bin_span = create_span_from(LHS->span.start, RHS->span.start + RHS->span.length);

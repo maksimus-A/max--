@@ -81,7 +81,7 @@ typedef struct BlockInfo {
 
 // Binary operators
 typedef struct BinaryOperatorInfo {
-    Token operator;
+    Token op;
     ASTNode* LHS;
     ASTNode* RHS;
 }BinOpInfo;

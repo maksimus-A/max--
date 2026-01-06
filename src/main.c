@@ -1,6 +1,6 @@
-#include "codegen/backend/arm64-gen/emitter.h"
+//#include "codegen/backend/arm64-gen/emitter.h"
 #include "codegen/backend/ir-verify/ir_verify.h"
-#include "codegen/backend/lir/arm64/lir.h"
+//#include "codegen/backend/lir/arm64/lir.h"
 #if defined(MAXC_ARENA_TESTS) && MAXC_ARENA_TESTS
 #include "arena/arena_test.h"
 #endif
@@ -18,8 +18,11 @@
 #include "semantics/scope.h"
 #include "semantics/walker.h"
 #include "semantics/def-assn-analysis/def_assn.h"
-#include "codegen/backend/frame-layout/arm64/frame_lay.h"
+//#include "codegen/backend/frame-layout/arm64/frame_lay.h"
 #include "codegen/ir-gen/mir.h"
+
+// C++ Backend now :)
+#include "codegen/backend/backend_api.h"
 #include "common.h"
 #include "debug.h"
 
@@ -220,6 +223,9 @@ int main(int argc, char **argv) {
 
     if (args.debug) fprintf(stdout, "\nIR Verifier: Instructions visited: %zu\n", verifier.inst_visited);
 
+    run_backend_pipeline(&builder.funcs, &mod, &arena, &ir_diags, &source_file, args.debug);
+
+    /*
     // Frame layout pass
     FrameLayout frame_layout = {0};
     frame_layout_init(&frame_layout, &ir_diags, &arena, &mod);
@@ -249,6 +255,7 @@ int main(int argc, char **argv) {
     }
     arm_emitter_init(&emitter, assm, &lir_builder.lir_funcs, &mod, &ir_diags);
     run_arm_emitter(&emitter);
+    */
     
     // Free all memory
     free(tokens.data);

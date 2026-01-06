@@ -31,6 +31,7 @@ void ir_walk_func_linear(IRVisitor* visitor, void* user, Vector* funcs) {
 
 // LIR: Walk all functions, blocks, and instructions
 // linearly (in vector order).
+/*
 void lir_walk_func_linear(LIRVisitor* visitor, void* user, Vector* funcs) {
 
     for (size_t i = 0; i < funcs->count; i++) {
@@ -51,3 +52,4 @@ void lir_walk_func_linear(LIRVisitor* visitor, void* user, Vector* funcs) {
         visitor->visit_func_end(user, f);
     }
 }
+*/

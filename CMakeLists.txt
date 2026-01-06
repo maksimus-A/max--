@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(maxc C)
+project(maxc C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -35,12 +35,14 @@ set(MAXC_SOURCES
     src/codegen/ir-gen/mir.c
     # IR verification
     src/codegen/backend/ir-verify/ir_verify.c
+    # New CPP Backend driver
+    src/codegen/backend/backend_driver.cpp
     # Frame Layout
-    src/codegen/backend/frame-layout/arm64/frame_lay.c
+    # src/codegen/backend/frame-layout/arm64/frame_lay.c
     # LIR generation
-    src/codegen/backend/lir/arm64/lir.c
+    # src/codegen/backend/lir/arm64/lir.c
     # ARM assembly generation
-    src/codegen/backend/arm64-gen/emitter.c
+    # src/codegen/backend/arm64-gen/emitter.c
 
 
     # IR walkers

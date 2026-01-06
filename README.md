@@ -4,6 +4,8 @@ A compiler for my own language I invented. I haven't made a formal spec website 
 
 The point was to help me learn both how the bootstrapping process works, how to self-host (just for fun), and the fun of inventing my own language.
 
+**UPDATE:** I am not bootstrapping this anymore. It's too much work. I just want to ship a really minimal language that compiles successfully at this point. Might bootstrap one day later.
+
 Right now I'm focusing on max-1, a simple, minimal language spec I can use to help self-host the rest of the compiler. I'll write it in C (I was going to do assembly for pureism but that sounded a bit too painful).
 
 The language will only compile to ARM64 for mac. I could have used LLVM as my target but I wanted to also learn about the backend compilation process.
@@ -17,12 +19,15 @@ maybe bootstrapping was feasible but now I'm not so sure. max-1 might be it for 
 Currently supports:
 
 Frontend:
-- lexes functions and integer declarations, and parses integer declarations/assignmentns only.
+- lexes functions and integer declarations, and parses integer declarations/assignments, as well as arithmetic expressions.
 - A scope resolution pass.
 - A definite assignment analysis pass.
 - A max-- intermediate representation (MIR) generation pass.
 
 Backend:
+
+**UPDATE:** Scrapping my entire backend, it sucks. Going to rewrite the whole thing in C++. Oh well!
+
 - Currently working on. Learning about how backends work in general.
 - Made an IR verification pass, frame layout pass, and LIR generation pass. Will do codegen pass, and consider doing 1-2 optimization passes later. Also will probably do register allocation at some point. Then I think I'm done with this for a bit.
 

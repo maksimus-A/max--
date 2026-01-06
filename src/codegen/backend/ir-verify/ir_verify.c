@@ -1,4 +1,5 @@
 #include "codegen/backend/ir-verify/ir_verify.h"
+#include "codegen/backend/ir_walkers.h"
 #include "codegen/ir-gen/mir.h"
 #include "table/ptrtable.h"
 #include <stdalign.h>
