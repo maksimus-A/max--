@@ -166,6 +166,7 @@ static LIRValue create_lir_value(IRValue ir_val, LIRFunction* func) {
             val.value_id.imm = ir_val.value_id.imm;
             break;
         }
+        default: break;
     }
     return val;
 }

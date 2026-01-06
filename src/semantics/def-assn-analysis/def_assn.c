@@ -98,15 +98,6 @@ bool definite_assignment_init(DefAssn* defassn, Diagnostics* diags, Arena* arena
     return true;
 }
 
-// todo: might be useless wrapper funcs. maybe remove
-/*
-bool name_resolution_init(PtrTable* name_res, Arena* arena) {
-    return true ? ptr_table_init(name_res, arena) : false;
-}
-void* name_resolution_get(PtrTable* name_res, size_t i) {
-    return get_ptr_tbl(name_res, i);
-}*/
-
 void print_bits(uint64_t value, size_t j) {
     size_t num_bits = 64;
 

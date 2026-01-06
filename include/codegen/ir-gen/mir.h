@@ -1,20 +1,10 @@
 // mir = max-- intermediate representation
 #pragma once
+#include "ast/parser/ast.h"
 #include "errors/diagnostics.h"
 #include "semantics/scope.h"
 #include "table/ptrtable.h"
 #include <stdint.h>
-
-#define VEC_INIT_T(vec, arena, T) \
-    vec_init((vec), (arena), sizeof(T), alignof(T))
-#define VEC_PUSH_T(vec, value) \
-    vec_push((vec), &(value))
-// Gives the item in vector at position i.
-#define VEC_AT_T(vec, T, i) \
-    (((T*)(vec)->items)[(i)])
-// Gives a pointer to item in vector at position i.
-#define VEC_AT_PTR_T(vec, T, i) \
-    (&((T*)(vec)->items)[(i)])
 
 // todo: add terminators to each block.
 // they can be 'return', 'br', 'brc', etc
@@ -22,6 +12,7 @@
 typedef enum IRInstructType {
     IR_STORE,
     IR_LOAD,
+    IR_BINOP,
     // todo: move this to IRTerminator list.
     IR_HALT // terminates program with status code. (currently exit(0))
     // no instructions allowed after exit.
@@ -40,11 +31,13 @@ typedef struct SlotId {
 
 typedef struct TempId {
     size_t id;
+    BuiltInType type;
 } TempId;
 
 typedef enum IRValueKind {
     IRVAL_TEMP,
-    IRVAL_IMM
+    IRVAL_IMM,
+    IRVAL_ERR
 } IRValueKind;
 
 // Stores either an Immediate (literal) or a Temp.
@@ -74,6 +67,38 @@ typedef struct Load {
 typedef struct Halt { // comes from exit(0), placeholder for 'return;'
     IRValue code; 
 } Halt;
+
+// Operations
+typedef enum {
+    BIN_ADD,
+    BIN_SUB,
+    BIN_MUL,
+    BIN_SDIV,
+    BIN_UDIV,
+    BIN_ERROR
+} BinOpKind;
+
+typedef struct BinOp {
+    TempId dst;
+    IRValue lhs;
+    IRValue rhs;
+    BinOpKind kind;
+} BinOp;
+
+// Comparisons
+typedef enum {
+    CMP_LT,
+    CMP_EQ,
+    CMP_NE,
+    // later: CMP_LE, CMP_GT, CMP_GE
+} CmpKind;
+
+typedef struct Compare {
+    TempId dst;
+    IRValue lhs;
+    IRValue rhs;
+    CmpKind kind;
+} Cmp;
 /* ------ Instruction payloads ------*/
 
 // Each "vector" will be cast to the proper type
@@ -85,6 +110,10 @@ typedef struct IRInstruct {
         Store store_payload;
         Load load_payload;
         Halt halt_payload;
+
+        // Operations
+        BinOp binop_pl;
+        Cmp cmp_pl;
     } payload;
 
     size_t ast_id;
@@ -147,7 +176,7 @@ typedef struct IRBuilder {
     // Symbol/slot table
     PtrTable slots;
 
-    // diagnostics struct?
+    // diagnostics struct? (UNUSED)?
     Diagnostics* diags;
 
     // Semantics tables
@@ -155,6 +184,9 @@ typedef struct IRBuilder {
 
     // Source file (mostly for printing MIR)
     Source* source_file;
+
+    // IRValue Stack
+    Vector val_stack;
 } IRBuilder;
 /* ------ IR structs ------*/
 

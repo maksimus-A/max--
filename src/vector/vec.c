@@ -1,6 +1,7 @@
 #include <stdalign.h>
 #include <stdio.h>
 #include <string.h>
+#include "codegen/ir-gen/mir.h"
 #include "vector/vec.h"
 
 bool ensure_capacity_vec(Vector* vec) {
@@ -33,6 +34,16 @@ bool vec_push(Vector* vec, const void* item) {
     }
     fprintf(stderr, "Failure allocating vector.");
     return false;
+}
+
+// Pops last element and returns pointer to last element.
+void* vec_pop(Vector* vec) {
+    if (vec->count == 0) return NULL;
+
+    vec->count--;
+
+    char* base = (char*)vec->items;
+    return base + (vec->item_size * vec->count);
 }
 
 void vec_init(Vector* vec, Arena* arena, size_t item_size, size_t item_align) {

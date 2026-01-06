@@ -9,7 +9,7 @@
 
 TempId create_temp_id(IRBuilder* builder);
 bool emit_load(IRBuilder* builder, ASTNode* node, TempId dst, SlotId src);
-SlotId get_slot_id(IRBuilder* builder, ASTNode* node);
+SlotId get_symbol_id_id(IRBuilder* builder, ASTNode* node);
 
 // Grabs n-th function in function list.
 IRFunction* get_nth_func(Vector* funcs, int i) {
@@ -67,18 +67,19 @@ bool insert_instruction(IRBuilder* builder, IRInstruct inst) {
 
 // Currently supports turning immediates and variables
 // into IR values, and emits a load into temp.
-IRValue get_ir_value(IRBuilder* builder, ASTNode* node) {
+// todo: rename to emit_rvalue
+IRValue emit_rvalue(IRBuilder* builder, ASTNode* node) {
     // TODO*: Be explicit this emits a load (for your future self).
     IRValue val = {0};
 
     switch (node->ast_kind) {
-        case AST_INT_LIT:
+        case AST_INT_LIT: // leaf
         {
             val.value_kind = IRVAL_IMM;
             val.value_id.imm = node->node_info.int_lit.value;
             break;
         }
-        case AST_NAME:
+        case AST_NAME: // leaf
         {
             val.value_kind = IRVAL_TEMP;
             IRFunction* f = get_curr_func(builder);
@@ -86,7 +87,7 @@ IRValue get_ir_value(IRBuilder* builder, ASTNode* node) {
             TempId temp = create_temp_id(builder);
             val.value_id.temp_id = temp;
             // Emit a load here with the temp we create.
-            SlotId var_slot = get_slot_id(builder, node);
+            SlotId var_slot = get_symbol_id_id(builder, node);
             assert(var_slot.id != SIZE_MAX);
             emit_load(builder, node, temp, var_slot);
             break;
@@ -100,7 +101,7 @@ IRValue get_ir_value(IRBuilder* builder, ASTNode* node) {
 }
 
 // Returns slot ID for current LHS variable.
-SlotId get_slot_id(IRBuilder* builder, ASTNode* node) {
+SlotId get_symbol_id_id(IRBuilder* builder, ASTNode* node) {
     SlotId slot_id = {0};
     switch (node->ast_kind) {
         case (AST_NAME):
@@ -127,8 +128,39 @@ SlotId get_slot_id(IRBuilder* builder, ASTNode* node) {
     return slot_id;
 }
 
+// Grabs our IR value from the stack.
+IRValue get_ir_value_stack(IRBuilder* builder) {
+    // Pop the value we need from the value stack.
+    IRValue* expr_val_ptr = (IRValue*)vec_pop(&builder->val_stack);
+    if (!expr_val_ptr) {
+        IRValue err_val = (IRValue) {.value_kind = IRVAL_ERR};
+        return err_val;
+    }
+    IRValue expr_val = *expr_val_ptr;
+    return expr_val;
+}
+
+// Gets BinOp kind based on token type.
+static BinOpKind get_binop_kind(ASTNode* node) {
+
+    Token op = node->node_info.bin_op.operator;
+    switch (op.token_kind) {
+        case PLUS: return BIN_ADD;
+        case MINUS: return BIN_SUB;
+        case MULT: return BIN_MUL;
+        case DIV: {
+            // TODO: This is complicated. I need to propogate the type
+            // of the whole operation to LHS/RHS or something; need a way
+            // to know what the type is. For now it'll always be UDIV.
+            return BIN_SDIV;
+        }
+        default: return BIN_ERROR;
+    }
+}
+
 // Returns the next available temp id, and increments
 // our temp id counter.
+// TODO: Should store temp type as well; I need AST_NAME to store the type too.
 TempId create_temp_id(IRBuilder* builder) {
     IRFunction* f = get_curr_func(builder);
     TempId temp = (TempId) {.id = f->next_temp_id.id};
@@ -168,6 +200,33 @@ bool emit_load(IRBuilder* builder, ASTNode* node, TempId dst, SlotId src) {
     };
     if (!insert_instruction(builder, load_inst)) {
         fprintf(stderr, "Failed to insert 'load' instruction into builder.");
+        return false;
+    }
+    return true;
+}
+
+
+
+static bool emit_binop(IRBuilder* builder, ASTNode* node, TempId dst, IRValue lhs, IRValue rhs) {
+    // grab LHS/RHS from node, store them into op with opkind
+    BinOpKind binop_kind = get_binop_kind(node);
+
+    BinOp binop = (BinOp) {
+        .dst = dst,
+        .kind = binop_kind,
+        .lhs = lhs,
+        .rhs = rhs,
+    };
+
+    IRInstruct binop_inst = (IRInstruct) {
+        .type = IR_BINOP,
+        .ast_id = node->id,
+        .span = node->span,
+        .payload.binop_pl = binop
+    };
+
+    if (!insert_instruction(builder, binop_inst)) {
+        fprintf(stderr, "Failed to insert 'bin_op' instruction into builder.");
         return false;
     }
     return true;
@@ -267,52 +326,102 @@ void mir_gen_post(void* user, ASTNode* node) {
         }
         case AST_VAR_DEC: 
         {
-            ASTNode* expr_node = get_child_expr(node);
-            if (expr_node == NULL) return;
-            // todo: heavily relies on the fact the RHS is either int lit or one var
-            IRValue expr_val = get_ir_value(builder, expr_node); // emits load op
             // slot of RHS
-            SlotId lhs_slot = get_slot_id(builder, node);
+            SlotId lhs_slot = get_symbol_id_id(builder, node);
 
             // Add 1 to function slot count for later, and
             // add slot_id to function slots table.
             IRFunction* f = get_curr_func(builder);
             
-            // Gets symbol from node, sets slot_i to symbol for function.
+            // Gets symbol from node, sets slot_i to symbol for function (LHS)
             set_ptr_tbl(&f->slot_sym, node->node_info.var_decl.symbol, f->next_slot_id);
             f->next_slot_id++;
 
             assert(lhs_slot.id != SIZE_MAX);
+
+            // Pop the value we need from the value stack.
+            IRValue expr_val = get_ir_value_stack(builder);
+            if (expr_val.value_kind == IRVAL_ERR) {
+                fprintf(stderr, "No value found in val_stack in var decl node.");
+                break;
+            }
+
             // Emit 1 store op
             emit_store(builder, node, lhs_slot, expr_val);
             break;
         }
         case AST_ASSN:
         {
-            ASTNode* expr_node = get_child_expr(node);
-            if (expr_node == NULL) return;
-            // todo: heavily relies on the fact the RHS is either int lit or one var
-            IRValue expr_val = get_ir_value(builder, expr_node);
             // slot of RHS
-            SlotId lhs_slot = get_slot_id(builder, node);
+            SlotId lhs_slot = get_symbol_id_id(builder, node);
             assert(lhs_slot.id != SIZE_MAX);
+
+            // Pop the value we need from the value stack.
+            IRValue expr_val = get_ir_value_stack(builder);
+            if (expr_val.value_kind == IRVAL_ERR) {
+                fprintf(stderr, "No value found in val_stack in assignment node.");
+                break;
+            }
+
             // Emit 1 store op
             emit_store(builder, node, lhs_slot, expr_val);
             break;
         }
-        // TODO: In AST_BINOP (or whatever it's called), call 'get_ir_val' and store results in 'slots' table.
-        case AST_NAME:
+        case AST_BIN_OP:
         {
+            // Emits bin op based on stack variables.
+            IRValue* prhs = (IRValue*)vec_pop(&builder->val_stack);
+            IRValue* plhs = (IRValue*)vec_pop(&builder->val_stack);
 
+            if (!prhs || !plhs) {
+                fprintf(stderr, "ERROR: not enough values for binop\n");
+                break;
+            }
+
+            IRValue rhs = *prhs;
+            IRValue lhs = *plhs;
+
+            // Create new temp?
+            IRFunction* f = get_curr_func(builder);
+            
+            // now create new temp?
+            TempId temp = create_temp_id(builder);
+
+            emit_binop(builder, node, temp, lhs, rhs);
+
+            // Push IRValue onto stack
+            IRValue val = (IRValue) {
+                .value_kind = IRVAL_TEMP,
+                .value_id.temp_id = temp
+            };
+            VEC_PUSH_T(&builder->val_stack, val);
+            break;
+        }
+        case AST_INT_LIT:
+        {
+            // TODO: AST_INT_LIT should really store its type too.
+            IRValue val = emit_rvalue(builder, node);
+            // Push onto value stack
+            VEC_PUSH_T(&builder->val_stack, val);
+            break;
+        }
+        case AST_NAME: // ast_name should always be on rhs of expr.
+        {
+            IRValue val = emit_rvalue(builder, node);
+
+            // Push onto value stack
+            VEC_PUSH_T(&builder->val_stack, val);
             break;
         }
         case AST_EXIT:
         {
-            
-            ASTNode* expr_node = get_child_expr(node);
-            if (expr_node == NULL) return;
+            // Pop the value we need from the value stack.
+            IRValue expr_val = get_ir_value_stack(builder);
+            if (expr_val.value_kind == IRVAL_ERR) {
+                fprintf(stderr, "No value found in val_stack in exit node.");
+                break;
+            }
 
-            IRValue expr_val = get_ir_value(builder, expr_node);
             emit_halt(builder, node, expr_val);
             break;
         }
@@ -333,6 +442,8 @@ void run_mir_gen(ASTNode* ast_root, IRBuilder* builder) {
 void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags, Semantics* sema, Source* source_file) {
     // initialize IRFunc
     VEC_INIT_T(&builder->funcs, arena, IRFunction);
+    // initialize IRValue stack
+    VEC_INIT_T(&builder->val_stack, arena, IRValue);
     builder->next_block_id.id = 0;
 
     builder->curr_func_index = SIZE_MAX;
@@ -345,6 +456,19 @@ void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags, Semantic
 }
 
 /*------ MIR PRINTING ------*/
+
+void print_op(BinOpKind kind, FILE* output) {
+    char* op_name;
+    switch (kind) {
+        case BIN_ADD: op_name = "add "; break;
+        case BIN_SUB: op_name = "sub "; break;
+        case BIN_MUL: op_name = "mul "; break;
+        case BIN_SDIV: op_name = "sdiv "; break;
+        case BIN_UDIV: op_name = "udiv "; break;
+        case BIN_ERROR: op_name = "NO_OP_FOUND "; break;
+    }
+    fprintf(output, "%s", op_name);
+}
 
 void print_slot(IRBuilder* builder, size_t symbol_id, FILE* output) {
     PtrTable name_res = builder->sema->name_resolution;
@@ -401,6 +525,29 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output) {
             }
             else if (halt.code.value_kind == IRVAL_TEMP) {
                 fprintf(output, "halt t%zu", halt.code.value_id.temp_id.id);
+            }
+            break;
+        }
+        case IR_BINOP:
+        {
+            BinOp binop = instr->payload.binop_pl;
+            print_op(binop.kind, output);
+
+            // Print destination
+            fprintf(output, "t%zu, ", binop.dst.id);
+
+            if (binop.lhs.value_kind == IRVAL_IMM) {
+                fprintf(output, "%lld, ", binop.lhs.value_id.imm);
+            }
+            else if (binop.lhs.value_kind == IRVAL_TEMP) {
+                fprintf(output, "t%zu, ", binop.lhs.value_id.temp_id.id);
+            }
+
+            if (binop.rhs.value_kind == IRVAL_IMM) {
+                fprintf(output, "%lld", binop.rhs.value_id.imm);
+            }
+            else if (binop.rhs.value_kind == IRVAL_TEMP) {
+                fprintf(output, "t%zu", binop.rhs.value_id.temp_id.id);
             }
             break;
         }

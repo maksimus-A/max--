@@ -355,7 +355,7 @@ ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
         if (RHS->ast_kind == AST_ERROR) return NULL;
 
         // Make binop info
-        BinOp bin_op = (BinOp) {
+        BinOpInfo bin_op = (BinOpInfo) {
             .LHS = LHS,
             .RHS = RHS,
             .operator = op

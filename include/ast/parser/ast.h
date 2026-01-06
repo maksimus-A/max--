@@ -80,11 +80,11 @@ typedef struct BlockInfo {
 } BlockInfo;
 
 // Binary operators
-typedef struct BinaryOperator {
+typedef struct BinaryOperatorInfo {
     Token operator;
     ASTNode* LHS;
     ASTNode* RHS;
-}BinOp;
+}BinOpInfo;
 
 //Built-ins
 // Exit
@@ -109,7 +109,7 @@ typedef struct ASTNode {
         BlockInfo block_info;
         ExitInfo exit_info;
         AssnStmtInfo assn_stmt;
-        BinOp bin_op;
+        BinOpInfo bin_op;
     } node_info;
 } ASTNode;
 

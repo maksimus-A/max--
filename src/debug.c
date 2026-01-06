@@ -21,6 +21,7 @@ void pretty_print_tokens(TokenBuffer* tokens, const char *buffer) {
     for (int i = 0; i < tokens->count; i++) {
         Token token = tokens->data[i];
         printf("%s ", token_kind_str[token.token_kind]);
+        if (token.token_kind == SEMICOLON) printf("\n");
         fflush(stdout);
     }
     printf("\n");
