@@ -90,6 +90,8 @@ struct LIRBlock {
     std::optional<LIRTerm> term;
 
     // For regalloc
+    // TODO*: actually build these in CFGGen pass!
+    // currently only ret terminator exists so there's nothing to do.
     std::vector<BlockId> preds;
     std::vector<BlockId> succs;
 

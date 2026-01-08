@@ -51,7 +51,19 @@ public:
     }
 
     // And's with entire vector. Assumes sizes are the same.
-    void and_with(const BitSet& bitset) {
+    BitSet and_with(const BitSet& bitset) const {
+        assert(bitset.num_bits == num_bits);
+
+        BitSet result = *this;
+
+        for (size_t i = 0; i < bits.size(); i++) {
+            result.bits[i] &= bitset.bits[i];
+        }
+
+        return result;
+    }
+
+    void and_assign(const BitSet& bitset) {
         assert(bitset.num_bits == num_bits);
 
         for (size_t i = 0; i < bits.size(); i++) {
@@ -59,15 +71,38 @@ public:
         }
     }
 
-    void and_not_with(const BitSet& bitset) {
-        assert(bitset.num_bits == num_bits);
+    BitSet and_not_with(const BitSet& other) const {
+        assert(other.num_bits == num_bits);
+
+        BitSet result = *this;
+
+        for (size_t i = 0; i < result.bits.size(); i++) {
+            result.bits[i] &= ~other.bits[i];
+        }
+
+        return result;
+    }
+
+    void and_not_assign(const BitSet& other) {
+        assert(other.num_bits == num_bits);
 
         for (size_t i = 0; i < bits.size(); i++) {
-            bits[i] &= ~bitset.bits[i];
+            bits[i] &= ~other.bits[i];
         }
     }
 
-    void or_with(const BitSet& bitset) {
+    BitSet or_with(const BitSet& bitset) const {
+        assert(bitset.num_bits == num_bits);
+
+        BitSet result = *this;
+
+        for (size_t i = 0; i < bits.size(); i++) {
+            result.bits[i] |= bitset.bits[i];
+        }
+        return result;
+    }
+
+    void or_assign(const BitSet& bitset) {
         assert(bitset.num_bits == num_bits);
 
         for (size_t i = 0; i < bits.size(); i++) {
@@ -96,7 +131,7 @@ public:
 private:
     void print_bits(uint64_t x) {
         for (int i = 63; i >= 0; --i) {
-            if ((i+1) % 16 == 0) std::cout << " ";
+            if ((i+1) % 8 == 0) std::cout << " ";
             std::cout << ((x >> i) & 1ULL);
         }
     }

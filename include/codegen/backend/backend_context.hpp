@@ -8,7 +8,7 @@ extern "C" {
 }
 
 struct LivenessInfo {
-    // Indexed by BlockId.
+    // Indexed by BlockId. Unique per function.
     std::vector<BitSet> use;
     std::vector<BitSet> def;
     std::vector<BitSet> in;
