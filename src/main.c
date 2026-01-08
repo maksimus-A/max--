@@ -223,7 +223,17 @@ int main(int argc, char **argv) {
 
     if (args.debug) fprintf(stdout, "\nIR Verifier: Instructions visited: %zu\n", verifier.inst_visited);
 
+    // Transfers all backend work to C++.
     run_backend_pipeline(&builder.funcs, &mod, &arena, &ir_diags, &source_file, args.debug);
+
+    // Free all memory
+    free(tokens.data);
+    free_source(&source_file);
+    free_ast_arena(&parser); // todo: just free arena; confusing naming.
+    
+    return 0;
+}
+
 
     /*
     // Frame layout pass
@@ -256,12 +266,3 @@ int main(int argc, char **argv) {
     arm_emitter_init(&emitter, assm, &lir_builder.lir_funcs, &mod, &ir_diags);
     run_arm_emitter(&emitter);
     */
-    
-    // Free all memory
-    free(tokens.data);
-    free_source(&source_file);
-    free_ast_arena(&parser); // todo: just free arena; confusing naming.
-    
-    return 0;
-}
-

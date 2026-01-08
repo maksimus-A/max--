@@ -1,8 +1,10 @@
+#pragma once
 #include <type_traits>
 #include <cstddef>   // size_t
 #include <cassert>   // assert
 extern "C" {
   #include "vector/vec.h"
+  #include "table/ptrtable.h"
 }
 
 /* Using this for accessing my C vectors nicely. 
@@ -33,5 +35,24 @@ public:
 
 private:
   const Vector* v;
+
+};
+
+template <typename T>
+class TableView {
+public:
+    explicit TableView(const PtrTable& tbl_): tbl(tbl_) {
+
+    }
+    
+    std::size_t size() const {return tbl.count;}
+    
+    const T* operator[](std::size_t i) const {
+        assert(i < tbl.count);
+        return reinterpret_cast<const T*>(tbl.items[i]);
+    }
+
+private:
+    const PtrTable& tbl;
 
 };

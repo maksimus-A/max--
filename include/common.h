@@ -45,11 +45,12 @@ typedef struct IRModule{
     // funcs == MIR functions.
     Vector* funcs;
     PtrTable* slot_type; // slot_id -> symbol type
-    FrameInfo* frames; // filled after frame_info pass.
     PtrTable* name_resolution; // slot_id -> symbol // todo: is resolved??
     // todo: below is uninitialized.
     PtrTable* VRegInfo; // vregid-> vreg size,type // todo: add in LIR_gen
     PtrTable* temp_inst; // tempid -> instruction
+    // Now uninit b/c removed from backend pipeline.
+    // FrameInfo* frames; // filled after frame_info pass.
 } IRModule;
 
 Result read_source_file(FILE* fp, Source* out); // Should return buffer of file ??

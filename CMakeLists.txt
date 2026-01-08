@@ -4,6 +4,10 @@ project(maxc C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 # Default to Debug if not specified
@@ -44,9 +48,19 @@ set(MAXC_SOURCES
     # ARM assembly generation
     # src/codegen/backend/arm64-gen/emitter.c
 
+    # LIR Gen
+    src/codegen/backend/lir/lir_gen.cpp
+    # CFG Gen
+    src/codegen/backend/cfg/cfg_gen.cpp
+
+    # Register Allocation
+
+    # Liveness Analysis
+    src/codegen/backend/regalloc/liveness_analysis.cpp
 
     # IR walkers
     src/codegen/backend/ir_walkers.c
+    src/codegen/backend/ir_walkers.cpp
 
     # Helpers
     src/table/ptrtable.c

@@ -113,7 +113,7 @@ typedef struct IRInstruct {
 
         // Operations
         BinOp binop_pl;
-        Cmp cmp_pl;
+        Cmp cmp_pl; // todo: unused
     } payload;
 
     size_t ast_id;
