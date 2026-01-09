@@ -71,6 +71,8 @@ private:
     BackendContext& ctx;
     LIRFunction* curr_func;
     LIRBlock* curr_block;
+    // Instruction positions increase by 2 to allow insertion between instructions
+    // Unique per function ??
     std::size_t inst_num;
     // todo: figure out how to pass a reference of this, or store it in ctx.
     std::vector<VRegInfo> vreg_info;
@@ -79,12 +81,16 @@ private:
 
     // Inserts instruction into current block.
     void insert_instruction(LIRPayload pl) {
-        curr_block->insts.emplace_back(pl, inst_num++);
+        curr_block->insts.emplace_back(pl, inst_num);
+        // Incrementing by 2 so I can easily add spill/restore instructions
+        // after regalloc (I hope).
+        inst_num += 2;
     }
 
     // Inserts terminator into separate terminator instruction.
     void insert_terminator(LIRPayload term_pl) {
-        curr_block->term = LIRInstruct(term_pl, inst_num++);
+        curr_block->term = LIRInstruct(term_pl, inst_num);
+        inst_num += 2;
     }
 
     // Creates new vreg in current function.

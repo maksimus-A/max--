@@ -7,15 +7,22 @@ extern "C" {
     #include "codegen/ir-gen/mir.h"
 }
 
+// For variable range creation/analysis
+// All unique per function.
+using Pos = std::size_t;
+struct Range { Pos start, end; }; // [start, end)
+struct Interval { std::vector<Range> ranges; /* maybe also vreg id */ };
+
+
 struct LivenessInfo {
+    // todo: consider moving these elsewhere. they can be discarded after intervals are constructed.
     // Indexed by BlockId. Unique per function.
-    std::vector<BitSet> use;
-    std::vector<BitSet> def;
-    std::vector<BitSet> in;
-    std::vector<BitSet> out;
+    std::vector<BitSet> use, def, in, out;
+
+    // indexed by vreg id
+    std::vector<Interval> intervals; 
+    std::size_t max_vreg_id;
 };
-
-
 
 class BackendContext {
 public:
@@ -23,7 +30,7 @@ public:
         :mod(mod_) {}
 
     std::vector<LIRFunction> lir_funcs;
-    std::vector<LivenessInfo> liveness;
+    std::vector<LivenessInfo> liveness; // Indexed by func_id
 
     // Returns the vector of MIR functions.
     VecView<IRFunction> mir_functions() { return VecView<IRFunction>(mod.funcs); }

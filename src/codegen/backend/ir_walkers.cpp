@@ -45,6 +45,33 @@ void walk_lir_linear(BackendContext& ctx, LIRVisitor& v) {
         v.post_func(func);
     }
 }
+
+// Walks instructions backwards.
+void walk_lir_backwards_insts_linear(BackendContext& ctx, LIRVisitor& v) {
+    std::size_t insts_visited = 0;
+    
+    for (auto& func : ctx.lir_funcs) {
+        v.pre_func(func);
+
+        for (auto& block : ctx.lir_blocks(func)) {
+            v.pre_block(block);
+
+            for (auto it = ctx.lir_insts(block).rbegin();
+                    it != ctx.lir_insts(block).rend();
+                    ++it)
+                {
+                    auto& inst = *it;
+                    v.visit_inst(inst);
+                    insts_visited++;
+                }
+            v.visit_terminator(block.term);
+            insts_visited++;
+            std::cout << "LIR Backwards Instruction Walker: Instructions Visited: " << insts_visited << std::endl;
+            v.post_block(block);
+        }
+        v.post_func(func);
+    }
+}
     /*
     // Grabs i-th mir function.
     const IRFunction& get_mir_function(size_t i) {

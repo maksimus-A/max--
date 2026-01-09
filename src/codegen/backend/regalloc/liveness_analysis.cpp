@@ -81,7 +81,7 @@ public:
     Pop B, recompute new_in/new_out.
     If either changed vs the stored in/out, overwrite them and push pred[B].
     */
-    void find_in_out() {
+    void construct_in_out() {
         for (auto& f: ctx.lir_funcs) {
             // Set livenessinfo
             curr_info = &ctx.liveness[f.id.id];
@@ -151,6 +151,19 @@ public:
         curr_info->out[b.id.id].print_bitset();
     }
 
+    /*------ VARIABLE LIVENESS PHASE: ------*/
+
+    // Constructs intervals determining vreg liveness.
+    // TODO: Maybe make a new struct/pass for this part later.
+    void construct_vreg_liveness() {
+        for (auto& f: ctx.lir_funcs) {
+            for (auto& b: f.blocks) {
+                
+            }
+        }
+    }
+
+
 private:
     BackendContext& ctx;
     bool debug;
@@ -162,6 +175,8 @@ private:
 
     // For IN/OUT analysis
     std::vector<BlockId> block_stack;
+
+
     
 
      /*------ USE/DEF PHASE: ------*/
@@ -202,6 +217,10 @@ private:
         return f.blocks[block_id.id];
     }
 
+    /*------ VARIABLE LIVENESS PHASE: ------*/
+    // This phase calculates live ranges of vregs.
+
+
 };
 
 void liveness_analysis(BackendContext& ctx, bool debug) {
@@ -209,5 +228,8 @@ void liveness_analysis(BackendContext& ctx, bool debug) {
     walk_lir_linear(ctx, liveness_anal);
 
     // In/out calculation
-    liveness_anal.find_in_out();
+    liveness_anal.construct_in_out();
+
+    // Liveness calculation (important one!)
+    liveness_anal.construct_vreg_liveness();
 }

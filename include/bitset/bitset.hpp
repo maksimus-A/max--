@@ -12,6 +12,14 @@ public:
         zero_bit_vec_init(num_bits);
     }
 
+    BitSet() : num_bits(64) { zero_bit_vec_init(num_bits); }
+
+    void resize(size_t num_bits_) {
+        bits.clear();
+        num_bits = num_bits_;
+        zero_bit_vec_init(num_bits_);
+    }
+
     void set(size_t bit_index) {
 
         uint64_t new_bits;

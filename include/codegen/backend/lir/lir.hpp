@@ -71,6 +71,7 @@ struct LIRBinOp {
 using LIRPayload = std::variant<LIRStore, LIRLoad, LIRRet, 
                             LIRConst, LIRBinOp>;
 
+
 struct LIRInstruct {
     explicit LIRInstruct(LIRPayload pl_, std::size_t inst_num_)
         : pl(pl_), inst_num(inst_num_) {}
