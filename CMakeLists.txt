@@ -57,6 +57,8 @@ set(MAXC_SOURCES
 
     # Liveness Analysis
     src/codegen/backend/regalloc/liveness_analysis.cpp
+    # Regalloc
+    src/codegen/backend/regalloc/regalloc_analysis.cpp
 
     # IR walkers
     src/codegen/backend/ir_walkers.c

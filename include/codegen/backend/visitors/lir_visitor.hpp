@@ -25,4 +25,8 @@ struct LIRVisitor {
 
 void construct_cfg(BackendContext& ctx, bool debug);
 void walk_lir_linear(BackendContext& ctx, LIRVisitor& v);
+void walk_lir_backwards_insts_linear(BackendContext& ctx, LIRVisitor& v);
+
+// Liveness analysis
 void liveness_analysis(BackendContext& ctx, bool debug);
+void regalloc(BackendContext& ctx, bool debug);

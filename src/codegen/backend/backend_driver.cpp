@@ -26,9 +26,12 @@ public:
         // does nothing yet since only terminator is 'ret'.
         construct_cfg(ctx, debug);
 
-        // CURRENTLY: Does use/def pass.
-        // TODO: IN/OUT pass.
+        // Does use/def pass,
+        // IN/OUT pass.
         liveness_analysis(ctx, debug);
+
+        // CURRENTLY: Finds live ranges of vregs; no regalloc.
+        regalloc(ctx, debug);
     }
 
 private:

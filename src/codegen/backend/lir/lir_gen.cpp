@@ -57,7 +57,7 @@ public:
             for (auto& b: f.blocks) {
                 out << "  block_" << b.id.id << ":\n";
                 for (auto& inst: b.insts) {
-                    out << "    ";
+                    out << "    " << inst.inst_num << ": ";
                     print_instruction(inst);
                 }
                 out << "    ";
@@ -299,7 +299,7 @@ private:
     void print_term(const std::optional<LIRTerm>& term) {
         if (std::holds_alternative<LIRRet>(term->pl)) {
             LIRRet ret = std::get<LIRRet>(term->pl);
-            out << "ret v" << ret.id.id << std::endl;
+            out << term->inst_num << ": ret v" << ret.id.id << std::endl;
         }
     }
 };

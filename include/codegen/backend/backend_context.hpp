@@ -7,10 +7,21 @@ extern "C" {
     #include "codegen/ir-gen/mir.h"
 }
 
+// std::visit helper (visit payloads mostly)
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
 // For variable range creation/analysis
 // All unique per function.
 using Pos = std::size_t;
-struct Range { Pos start, end; }; // [start, end)
+struct Range { 
+    Range(Pos start_, Pos end_): start(start_), end(end_) {}
+    Pos start, end; 
+}; // [start, end)
 struct Interval { std::vector<Range> ranges; /* maybe also vreg id */ };
 
 
@@ -66,6 +77,19 @@ public:
         return b.insts;
     }
 
+    bool op_is_imm(Operand op) {
+        bool is_imm;
+        std::visit(overloaded{
+            [&](const VRegId& vreg) {
+                is_imm = false;
+            },
+            [&](const uint64_t) {
+                is_imm = true;
+            }
+        }, op);
+        return is_imm;
+    }
+
 private:
     const IRModule& mod;
     // Sooo just so I don't forget:
@@ -74,5 +98,7 @@ private:
     // the blockId inside a function.
     
 };
+
+
 
 
