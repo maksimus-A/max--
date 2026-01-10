@@ -145,6 +145,7 @@ private:
             },
             [&](const LIRRet& ret) {
                 used.push_back(ret.id);
+                out << "Pushed back ret ID";
             },
             [&](auto const&) {
                 // no uses

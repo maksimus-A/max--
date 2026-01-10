@@ -1,6 +1,7 @@
 #include "codegen/backend/backend_context.hpp"
 #include "codegen/backend/visitors/mir_visitor.hpp"
 #include "codegen/backend/visitors/lir_visitor.hpp"
+#include <variant>
 extern "C" {
     #include "codegen/ir-gen/mir.h"
 }
@@ -56,6 +57,13 @@ void walk_lir_backwards_insts_linear(BackendContext& ctx, LIRVisitor& v) {
         for (auto& block : ctx.lir_blocks(func)) {
             v.pre_block(block);
 
+            // Visit terminator first.
+            std::optional<LIRTerm>& opt = block.term;
+            if (opt.has_value()) {
+                const LIRTerm& term = *opt;
+                v.visit_inst(term);
+            }
+            
             for (auto it = ctx.lir_insts(block).rbegin();
                     it != ctx.lir_insts(block).rend();
                     ++it)
