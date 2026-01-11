@@ -39,12 +39,13 @@ public:
 
     // todo: maybe make these private with accessors?
     // depends on if they need to be mutated.
+    // All indexed by FuncId.
     std::vector<LIRFunction> lir_funcs;
-    std::vector<LivenessInfo> liveness; // Indexed by func_id
+    std::vector<LivenessInfo> liveness;
     // Location info mapping vreg -> (preg|slot).
-    // Indexed by FuncId.
     std::vector<std::vector<Location>> locs;
-    std::vector<FrameInfo> frame_info; // Indexed by FuncId.
+    std::vector<std::optional<FrameInfo>> frame_info;
+    std::vector<TableView<Symbol>> slot_syms;
 
     // Returns the vector of MIR functions.
     VecView<IRFunction> mir_functions() { return VecView<IRFunction>(mod.funcs); }

@@ -1,6 +1,7 @@
 #pragma once
 #include "codegen/backend/regalloc/regalloc_analysis.hpp"
 #include "codegen/backend/reg_ids.hpp"
+#include "vector/vec_view.hpp"
 #include <cstddef>
 #include <optional>
 #include <variant>

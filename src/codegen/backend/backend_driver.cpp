@@ -14,6 +14,7 @@ extern "C" {
 #include "codegen/backend/lir/lir_print.hpp"
 #include "codegen/backend/visitors/mir_visitor.hpp"
 #include "codegen/backend/visitors/lir_visitor.hpp"
+#include "common.hpp"
 
 // Essentially "main" for the cpp backend.
 class BackendDriver {
@@ -31,8 +32,12 @@ public:
         // IN/OUT pass.
         liveness_analysis(ctx, debug);
 
-        // CURRENTLY: Finds live ranges of vregs; no regalloc.
+        // Finds live ranges of vregs, and does full regalloc,
+        // including substituting vreg -> preg and spill inst insertion.
         regalloc(ctx, debug);
+
+        // Constructs frame layouts per function
+        run_frame_layout(ctx, debug);
     }
 
 private:

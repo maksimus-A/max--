@@ -61,6 +61,9 @@ set(MAXC_SOURCES
     # Regalloc
     src/codegen/backend/regalloc/regalloc_analysis.cpp
 
+    # Frame Layout
+    src/codegen/backend/frame-layout/frame_layout.cpp
+
     # IR walkers
     src/codegen/backend/ir_walkers.c
     src/codegen/backend/ir_walkers.cpp
