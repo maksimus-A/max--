@@ -45,30 +45,32 @@ public:
 
     // Computes use/def per block.
     void visit(const LIRLoad& load) override {
-        note_def(load.dst);
+        note_def(get_vreg(load.dst));
     }
     void visit(const LIRStore& store) override {
-        note_use(store.src);
+        note_use(get_vreg(store.src));
     }
     void visit(const LIRBinOp& binop) override {
         // Check whether LHS/RHS are imm/vregs. If Imm skip.
         // If vregs, do normal checking.
-        if (std::holds_alternative<VRegId>(binop.lhs)) {
-            VRegId lhs = std::get<VRegId>(binop.lhs);
-            note_use(lhs);
+        if (std::holds_alternative<Reg>(binop.lhs)) {
+            Reg lhs = std::get<Reg>(binop.lhs);
+            VRegId vreg = get_vreg(lhs);
+            note_use(vreg);
         }
-        if (std::holds_alternative<VRegId>(binop.rhs)) {
-            VRegId rhs = std::get<VRegId>(binop.rhs);
-            note_use(rhs);
+        if (std::holds_alternative<Reg>(binop.rhs)) {
+            Reg rhs = std::get<Reg>(binop.rhs);
+            VRegId vreg = get_vreg(rhs);
+            note_use(vreg);
         }
 
-        note_def(binop.dst);
+        note_def(get_vreg(binop.dst));
     }
     void visit(const LIRConst& con) override {
-        note_def(con.dst);
+        note_def(get_vreg(con.dst));
     }
     void visit(const LIRRet& ret) override {
-        note_use(ret.id);
+        note_use(get_vreg(ret.id));
     }
 
     /*----- IN/OUT PHASE: ------*/

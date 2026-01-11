@@ -58,6 +58,32 @@ public:
         }
     }
 
+    // Might not work if the last word is partial here.
+    void set_ones_bit_vec() {
+        uint64_t mask = (num_bits == 64)
+            ? ~uint64_t{0}
+            : ((uint64_t{1} << num_bits) - 1);
+
+        for (size_t i = 0; i < bits.size(); i++) {
+            bits[i] = mask;
+        }
+    }
+
+    // Returns the first available index that is a 0 (starting from RHS).
+    // TODO: Might be buggy if the first occurrence is past the first word.
+    int get_first_zero_position() {
+
+        for (size_t i = 0; i < bits.size(); i++) {
+            uint64_t word = ~get_word(i);
+            for (size_t j = 0; j < 64; j++) {
+                if (word & (1ULL << j)) return int(i*64 + j);
+            }
+        }
+
+        return -1;
+    }
+
+
     // And's with entire vector. Assumes sizes are the same.
     BitSet and_with(const BitSet& bitset) const {
         assert(bitset.num_bits == num_bits);

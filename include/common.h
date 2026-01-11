@@ -6,7 +6,7 @@
 #define START_BUFFER_SIZE 16
 
 // todo**: check if this works. IDK
-typedef struct FrameInfo FrameInfo;
+// typedef struct FrameInfo FrameInfo;
 
 // TODO: Result should also return
 // a pointer to a struct I need? Right now

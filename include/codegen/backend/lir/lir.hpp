@@ -1,4 +1,6 @@
 #pragma once
+#include "codegen/backend/regalloc/regalloc_analysis.hpp"
+#include "codegen/backend/reg_ids.hpp"
 #include <cstddef>
 #include <optional>
 #include <variant>
@@ -7,21 +9,15 @@ extern "C" {
     #include "ast/parser/ast.h"
     #include "codegen/ir-gen/mir.h"
 }
-#include "bitset/bitset.hpp"
 
 class BackendContext;
 
-// Temp -> virtual registers
-struct VRegId {
-    std::size_t id;
-};
 
 // todo: make table in BackendContext that stores vregid->VRegInfo
 struct VRegInfo { // virtual register (for temps)
     std::size_t size;
     BuiltInType type;
 };
-
 
 /* ------ Instruction payload helpers ------*/
 
@@ -30,13 +26,13 @@ struct LIRStore {
     explicit LIRStore(SlotId dst_, VRegId src_)
         : dst(dst_), src(src_) {}
     SlotId dst;
-    VRegId src;
+    Reg src;
 };
 
 struct LIRLoad { 
     explicit LIRLoad(SlotId src_, VRegId dst_)
         : src(src_), dst(dst_) {}
-    VRegId dst;
+    Reg dst;
     SlotId src;
 };
 
@@ -44,7 +40,7 @@ struct LIRLoad {
 struct LIRConst {
     explicit LIRConst(VRegId dst_, int64_t src_)
         : dst(dst_), src(src_) {}
-    VRegId dst;
+    Reg dst;
     int64_t src;
 };
 
@@ -52,18 +48,18 @@ struct LIRConst {
 struct LIRRet { // comes from exit(0), placeholder for 'return;'
     explicit LIRRet(VRegId code_)
         : id(code_) {}
-    VRegId id;
+    Reg id;
 };
 
 // Binary operators
 
-using Operand = std::variant<VRegId, int64_t>;
+using Operand = std::variant<Reg, int64_t>;
 
 struct LIRBinOp {
     explicit LIRBinOp(BinOpKind bin_op_kind_, VRegId dst_, Operand lhs_, Operand rhs_)
         : bin_op_kind(bin_op_kind_), dst(dst_), lhs(lhs_), rhs(rhs_) {}
     BinOpKind bin_op_kind;
-    VRegId dst;
+    Reg dst;
     Operand lhs;
     Operand rhs;
 };
@@ -103,10 +99,12 @@ struct LIRFunction {
     explicit LIRFunction(FuncId id_, size_t next_temp_id)
         :id(id_), next_vreg(next_temp_id) {
             entry = BlockId{0}; // todo: consider some kind of wrapper to init this
+            max_slot_id = 0;
         }
 
     std::vector<LIRBlock> blocks;
     std::size_t next_vreg; // this can also tell max_vregs per function.
+    std::size_t max_slot_id; // For register allocation later.
     BlockId entry;
 
     FuncId id;

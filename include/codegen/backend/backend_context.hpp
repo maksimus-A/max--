@@ -1,5 +1,7 @@
 #pragma once
 #include "codegen/backend/lir/lir.hpp"
+#include "codegen/backend/regalloc/regalloc_analysis.hpp"
+#include "codegen/backend/frame-layout/frame_layout.hpp"
 #include "vector/vec_view.hpp"
 #include <vector>
 extern "C" {
@@ -15,14 +17,11 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-// For variable range creation/analysis
-// All unique per function.
-using Pos = std::size_t;
-struct Range { 
-    Range(Pos start_, Pos end_): start(start_), end(end_) {}
-    Pos start, end; 
-}; // [start, end)
-struct Interval { std::vector<Range> ranges; /* maybe also vreg id */ };
+// std::holds_alternative helper. Sick of writing it out man.
+template <typename T, typename Variant>
+bool alt(const Variant& v) {
+    return std::holds_alternative<T>(v);
+}
 
 
 struct LivenessInfo {
@@ -35,13 +34,21 @@ struct LivenessInfo {
     std::size_t max_vreg_id;
 };
 
+
+
 class BackendContext {
 public:
     BackendContext(IRModule& mod_)
         :mod(mod_) {}
 
+    // todo: maybe make these private with accessors?
+    // depends on if they need to be mutated.
     std::vector<LIRFunction> lir_funcs;
     std::vector<LivenessInfo> liveness; // Indexed by func_id
+    // Location info mapping vreg -> (preg|slot).
+    // Indexed by FuncId.
+    std::vector<std::vector<Location>> locs;
+    std::vector<FrameInfo> frame_info; // Indexed by FuncId.
 
     // Returns the vector of MIR functions.
     VecView<IRFunction> mir_functions() { return VecView<IRFunction>(mod.funcs); }
@@ -80,7 +87,7 @@ public:
     bool op_is_imm(Operand op) {
         bool is_imm;
         std::visit(overloaded{
-            [&](const VRegId& vreg) {
+            [&](const Reg& reg) {
                 is_imm = false;
             },
             [&](const uint64_t) {
@@ -90,12 +97,20 @@ public:
         return is_imm;
     }
 
+    // Regalloc stuff
+
+    const std::vector<Location>& locs_by_func(FuncId id) {
+        return locs[id.id];
+    }
+
+    const std::size_t vreg_to_preg(FuncId fid, VRegId vreg) {
+        if (locs_by_func(fid)[vreg.id].kind == LOC_PREG)
+            return locs_by_func(fid)[vreg.id].id;
+        return SIZE_MAX;
+    }
+
 private:
     const IRModule& mod;
-    // Sooo just so I don't forget:
-    // This vector is indexed by FuncId.
-    // Each vector inside of liveness is indexed by
-    // the blockId inside a function.
     
 };
 

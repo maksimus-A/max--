@@ -1,5 +1,6 @@
 #include "codegen/backend/visitors/mir_visitor.hpp"
 #include "codegen/backend/lir/lir.hpp"
+#include <algorithm>
 #include <iostream>
 #include <ostream>
 #include <stdint.h>
@@ -109,6 +110,8 @@ private:
     void create_load(const IRInstruct& inst) {
         const Load& load = inst.payload.load_payload;
 
+        compare_slot_id_to_max(load.src);
+
         VRegId vreg = VRegId{load.dst.id};
         // todo: insert into vreginfo.
         LIRLoad lir_load = LIRLoad(load.src, vreg);
@@ -118,6 +121,8 @@ private:
 
     void create_store(const IRInstruct& inst) {
         const Store& store = inst.payload.store_payload;
+
+        compare_slot_id_to_max(store.dst);
 
         // For myself: returns a lambda, the [&] lets me use
         // outer scoped variables.
@@ -249,6 +254,12 @@ private:
         assert(false);
     }
 
+    // Compare passed in slot ID to current found max ID. Tells us how 
+    // many slots exist in this function.
+    void compare_slot_id_to_max(SlotId slot_id) {
+        curr_func->max_slot_id = std::max( curr_func->max_slot_id, slot_id.id);
+    }
+
     void print_bin_op(const LIRBinOp& binop) {
         switch (binop.bin_op_kind) {
             case BIN_ADD: out << "add "; break;
@@ -258,40 +269,43 @@ private:
             case BIN_UDIV: out << "udiv "; break;
             case BIN_ERROR: out << "ERROR_OP "; break;
         }
-        out << "v" << binop.dst.id << ", ";
+        VRegId dst = std::get<VRegId>(binop.dst.id);
+        out << "v" << dst.id << ", ";
 
-        if (std::holds_alternative<int64_t>(binop.lhs)) {
+        if (alt<int64_t>(binop.lhs)) {
             int64_t lhs = std::get<int64_t>(binop.lhs);
             out << "#" << lhs << ", ";
         }
-        if (std::holds_alternative<VRegId>(binop.lhs)) {
-            VRegId lhs = std::get<VRegId>(binop.lhs);
-            out << "v" << lhs.id << ", ";
+        if (alt<Reg>(binop.lhs)) {
+            Reg lhs = std::get<Reg>(binop.lhs);
+            VRegId vreg = std::get<VRegId>(lhs.id);
+            out << "v" << vreg.id << ", ";
         }
-        if (std::holds_alternative<int64_t>(binop.rhs)) {
+        if (alt<int64_t>(binop.rhs)) {
             int64_t rhs = std::get<int64_t>(binop.rhs);
             out << "#" << rhs << std::endl;
         }
-        if (std::holds_alternative<VRegId>(binop.rhs)) {
-            VRegId rhs = std::get<VRegId>(binop.rhs);
-            out << "v" << rhs.id << std::endl;
+        if (alt<Reg>(binop.rhs)) {
+            Reg rhs = std::get<Reg>(binop.rhs);
+            VRegId vreg = std::get<VRegId>(rhs.id);
+            out << "v" << vreg.id << std::endl;
         }
     }
 
     void print_instruction(const LIRInstruct& inst) {
-        if (std::holds_alternative<LIRStore>(inst.pl)) {
+        if (alt<LIRStore>(inst.pl)) {
             LIRStore store = std::get<LIRStore>(inst.pl);
-            out << "store slot(" << store.dst.id << "), v" << store.src.id << std::endl;
+            out << "store slot(" << store.dst.id << "), v" << get_vreg(store.src).id << std::endl;
         }
-        if (std::holds_alternative<LIRLoad>(inst.pl)) {
+        if (alt<LIRLoad>(inst.pl)) {
             LIRLoad load = std::get<LIRLoad>(inst.pl);
-            out << "load v" << load.dst.id << ", slot(" << load.src.id << ")" << std::endl;
+            out << "load v" << get_vreg(load.dst).id << ", slot(" << load.src.id << ")" << std::endl;
         }
-        if (std::holds_alternative<LIRConst>(inst.pl)) {
+        if (alt<LIRConst>(inst.pl)) {
             LIRConst const_ = std::get<LIRConst>(inst.pl);
-            out << "const v" << const_.dst.id << ", #" << const_.src << std::endl;
+            out << "const v" << get_vreg(const_.dst).id << ", #" << const_.src << std::endl;
         }
-        if (std::holds_alternative<LIRBinOp>(inst.pl)) {
+        if (alt<LIRBinOp>(inst.pl)) {
             print_bin_op(std::get<LIRBinOp>(inst.pl));
         }
     }
@@ -299,7 +313,7 @@ private:
     void print_term(const std::optional<LIRTerm>& term) {
         if (std::holds_alternative<LIRRet>(term->pl)) {
             LIRRet ret = std::get<LIRRet>(term->pl);
-            out << term->inst_num << ": ret v" << ret.id.id << std::endl;
+            out << term->inst_num << ": ret v" << get_vreg(ret.id).id << std::endl;
         }
     }
 };
