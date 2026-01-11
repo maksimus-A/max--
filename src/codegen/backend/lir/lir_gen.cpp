@@ -27,6 +27,9 @@ public:
     void pre_func(const IRFunction& f) override {
         lir_funcs.emplace_back(f.id, f.next_temp_id.id);
         curr_func = &lir_funcs.back();
+        
+        // Insert slot_sym table into ctx
+        ctx.slot_syms.push_back(ctx.slot_to_symbol(f));
     }
 
     void post_func(const IRFunction& f) override {
