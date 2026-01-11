@@ -17,11 +17,7 @@ struct overloaded : Ts... {
 template <class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-// std::holds_alternative helper. Sick of writing it out man.
-template <typename T, typename Variant>
-bool alt(const Variant& v) {
-    return std::holds_alternative<T>(v);
-}
+
 
 
 struct LivenessInfo {

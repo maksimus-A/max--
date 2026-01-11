@@ -25,12 +25,16 @@ struct VRegInfo { // virtual register (for temps)
 struct LIRStore {
     explicit LIRStore(SlotId dst_, VRegId src_)
         : dst(dst_), src(src_) {}
+    explicit LIRStore(SlotId dst_, PRegId src_)
+        : dst(dst_), src(src_) {}
     SlotId dst;
     Reg src;
 };
 
 struct LIRLoad { 
     explicit LIRLoad(SlotId src_, VRegId dst_)
+        : src(src_), dst(dst_) {}
+    explicit LIRLoad(SlotId src_, PRegId dst_)
         : src(src_), dst(dst_) {}
     Reg dst;
     SlotId src;

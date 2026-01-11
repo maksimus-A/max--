@@ -4,8 +4,6 @@
 #include <cstddef>
 #include <vector>
 
-#define ARM_FREE_REGS 4
-#define ARM_SCRATCH_REGS 2
 
 // For variable range creation/analysis
 // All unique per function.

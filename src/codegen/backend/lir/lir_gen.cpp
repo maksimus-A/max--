@@ -1,5 +1,6 @@
 #include "codegen/backend/visitors/mir_visitor.hpp"
 #include "codegen/backend/lir/lir.hpp"
+#include "codegen/backend/lir/lir_print.hpp"
 #include <algorithm>
 #include <iostream>
 #include <ostream>
@@ -51,21 +52,7 @@ public:
         }
     }
 
-    // Printing LIR!
-    void print_lir() {
-        for (auto& f: lir_funcs) {
-            out << "function_" << f.id.id << ":\n";
-            for (auto& b: f.blocks) {
-                out << "  block_" << b.id.id << ":\n";
-                for (auto& inst: b.insts) {
-                    out << "    " << inst.inst_num << ": ";
-                    print_instruction(inst);
-                }
-                out << "    ";
-                print_term(b.term);
-            }
-        }
-    }
+
 
 
 private:
@@ -260,67 +247,12 @@ private:
         curr_func->max_slot_id = std::max( curr_func->max_slot_id, slot_id.id);
     }
 
-    void print_bin_op(const LIRBinOp& binop) {
-        switch (binop.bin_op_kind) {
-            case BIN_ADD: out << "add "; break;
-            case BIN_SUB: out << "sub "; break;
-            case BIN_MUL: out << "mul "; break;
-            case BIN_SDIV: out << "sdiv "; break;
-            case BIN_UDIV: out << "udiv "; break;
-            case BIN_ERROR: out << "ERROR_OP "; break;
-        }
-        VRegId dst = std::get<VRegId>(binop.dst.id);
-        out << "v" << dst.id << ", ";
 
-        if (alt<int64_t>(binop.lhs)) {
-            int64_t lhs = std::get<int64_t>(binop.lhs);
-            out << "#" << lhs << ", ";
-        }
-        if (alt<Reg>(binop.lhs)) {
-            Reg lhs = std::get<Reg>(binop.lhs);
-            VRegId vreg = std::get<VRegId>(lhs.id);
-            out << "v" << vreg.id << ", ";
-        }
-        if (alt<int64_t>(binop.rhs)) {
-            int64_t rhs = std::get<int64_t>(binop.rhs);
-            out << "#" << rhs << std::endl;
-        }
-        if (alt<Reg>(binop.rhs)) {
-            Reg rhs = std::get<Reg>(binop.rhs);
-            VRegId vreg = std::get<VRegId>(rhs.id);
-            out << "v" << vreg.id << std::endl;
-        }
-    }
-
-    void print_instruction(const LIRInstruct& inst) {
-        if (alt<LIRStore>(inst.pl)) {
-            LIRStore store = std::get<LIRStore>(inst.pl);
-            out << "store slot(" << store.dst.id << "), v" << get_vreg(store.src).id << std::endl;
-        }
-        if (alt<LIRLoad>(inst.pl)) {
-            LIRLoad load = std::get<LIRLoad>(inst.pl);
-            out << "load v" << get_vreg(load.dst).id << ", slot(" << load.src.id << ")" << std::endl;
-        }
-        if (alt<LIRConst>(inst.pl)) {
-            LIRConst const_ = std::get<LIRConst>(inst.pl);
-            out << "const v" << get_vreg(const_.dst).id << ", #" << const_.src << std::endl;
-        }
-        if (alt<LIRBinOp>(inst.pl)) {
-            print_bin_op(std::get<LIRBinOp>(inst.pl));
-        }
-    }
-
-    void print_term(const std::optional<LIRTerm>& term) {
-        if (std::holds_alternative<LIRRet>(term->pl)) {
-            LIRRet ret = std::get<LIRRet>(term->pl);
-            out << term->inst_num << ": ret v" << get_vreg(ret.id).id << std::endl;
-        }
-    }
 };
 
 
 void lower_mir_to_lir(BackendContext& ctx, bool debug) {
     LIRGen gen(ctx, ctx.lir_funcs, std::cout);
     walk_mir_linear(ctx, gen);
-    if (debug) gen.print_lir();
+    if (debug) print_lir(gen.lir_funcs, std::cout);
 }

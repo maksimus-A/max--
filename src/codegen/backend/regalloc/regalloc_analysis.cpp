@@ -1,7 +1,13 @@
 #include "codegen/backend/backend_context.hpp"
 #include "codegen/backend/lir/lir.hpp"
+#include "codegen/backend/lir/lir_print.hpp"
 #include "codegen/backend/visitors/lir_visitor.hpp"
 #include "codegen/backend/regalloc/regalloc_analysis.hpp"
+#include "codegen/backend/reg_ids.hpp"
+#include "common.hpp"
+
+#include <unordered_map>
+#include <unordered_set>
 
 
 struct RegAllocAnalysis: LIRVisitor {
@@ -109,46 +115,202 @@ public:
     }
 
     /*------ ADDING SPILLED VREG TO INST PASS ------*/
-    void add_spilled_to_insts() {
-            /*
-        Idea: run through loc list per function.
-        if kind == LOC_SLOT,
-            find instruction # where we first spill.
-            insert 'load into scratch' before
-            insert 'store into slot' after.
-        That's kind of it.
-        Append new insts to LIRBlock
-        */
-        for (auto& f: ctx.lir_funcs) {
-            const std::vector<Location>& locs = ctx.locs_by_func(f.id);
-
-            for (auto& b: ctx.lir_blocks(f)) {
-                std::vector<LIRInstruct> insts;
-
-                for (const auto& i: ctx.lir_insts(b)) {
-
-                    LIRInstruct inst = i;
-
-                    for (const auto& vreg: uses(i)) {
-                        if (locs[vreg.id].kind == LOC_PREG) {
-                            
-                        }
-                        else if (locs[vreg.id].kind == LOC_SLOT) {
-                            
-                        }
-                    }
-                    for (const auto& vreg: defs(i)) {
-                        if (locs[vreg.id].kind == LOC_PREG) {
-                            
-                        }
-                        else if (locs[vreg.id].kind == LOC_SLOT) {
-                            
-                        }
-                    }
-                }
+    // ------------------------------------------------------------
+    // Small helper: rewrite a Reg if it currently holds a vreg id in map
+    // ------------------------------------------------------------
+    static inline void rewrite_reg_if_vreg_in_map(
+        Reg& r,
+        const std::unordered_map<std::size_t, PRegId>& vreg_to_preg
+    ) {
+        if (alt<VRegId>(r.id)) {
+            VRegId v = get<VRegId>(r.id);
+            auto it = vreg_to_preg.find(v.id);
+            if (it != vreg_to_preg.end()) {
+                r = Reg{ it->second };
             }
         }
     }
+
+    // ------------------------------------------------------------
+    // Small helper: rewrite an Operand if it is a Reg holding a mapped vreg
+    // ------------------------------------------------------------
+    static inline void rewrite_operand_if_reg_vreg_in_map(
+        Operand& op,
+        const std::unordered_map<std::size_t, PRegId>& vreg_to_preg
+    ) {
+        if (alt<Reg>(op)) {
+            Reg r = get<Reg>(op);
+            rewrite_reg_if_vreg_in_map(r, vreg_to_preg);
+            op = r; // re-store (safe even if unchanged)
+        }
+    }
+
+    // ------------------------------------------------------------
+    // NEW HELPER: rewrite every vreg occurrence inside one instruction
+    // ------------------------------------------------------------
+    void rewrite_inst_regs(
+        LIRInstruct& inst,
+        const std::unordered_map<std::size_t, PRegId>& vreg_to_preg
+    ) {
+        std::visit(overloaded{
+            [&](LIRLoad& load) {
+                // Only rewrite dst if it's that vreg (don’t clobber unrelated regs)
+                rewrite_reg_if_vreg_in_map(load.dst, vreg_to_preg);
+            },
+            [&](LIRStore& store) {
+                rewrite_reg_if_vreg_in_map(store.src, vreg_to_preg);
+            },
+            [&](LIRConst& cons) {
+                rewrite_reg_if_vreg_in_map(cons.dst, vreg_to_preg);
+            },
+            [&](LIRRet& ret) {
+                rewrite_reg_if_vreg_in_map(ret.id, vreg_to_preg);
+            },
+            [&](LIRBinOp& binop) {
+                rewrite_reg_if_vreg_in_map(binop.dst, vreg_to_preg);
+                rewrite_operand_if_reg_vreg_in_map(binop.lhs, vreg_to_preg);
+                rewrite_operand_if_reg_vreg_in_map(binop.rhs, vreg_to_preg);
+            },
+            [&](auto&) {
+                // do nothing
+            }
+        }, inst.pl);
+    }
+
+
+    // TODO: I CHEATED OKAY?? I CHEATED. I WROTE THIS WHOLE THING AND IT WAS
+    // TERRIBLE. I SAID REWRITE MY CRAP . Just refactor it to not use unordered_thing
+    // later. sigh
+    struct SpillRewriteResult {
+        std::vector<LIRInstruct> before;
+        std::vector<LIRInstruct> after;
+    };
+
+    SpillRewriteResult spill_rewrite_before_after(
+        LIRInstruct& inst,
+        const std::vector<Location>& locs
+    ) {
+        ScratchRegs scratch_regs;
+
+        std::unordered_map<std::size_t, PRegId> vreg_to_preg;
+        std::unordered_set<std::size_t> spilled_uses;
+        std::unordered_set<std::size_t> spilled_defs;
+        std::unordered_set<std::size_t> all_vregs;
+        std::unordered_map<std::size_t, SlotId> spilled_slot;
+
+        for (const auto& vreg : uses(inst)) {
+            all_vregs.insert(vreg.id);
+            const Location& L = locs.at(vreg.id);
+            if (L.kind == LOC_SLOT) spilled_uses.insert(vreg.id);
+        }
+        for (const auto& vreg : defs(inst)) {
+            all_vregs.insert(vreg.id);
+            const Location& L = locs.at(vreg.id);
+            if (L.kind == LOC_SLOT) spilled_defs.insert(vreg.id);
+        }
+
+        for (std::size_t vreg_id : all_vregs) {
+            const Location& L = locs.at(vreg_id);
+            if (L.kind == LOC_PREG) {
+                vreg_to_preg.emplace(vreg_id, PRegId{L.id});
+            } else if (L.kind == LOC_SLOT) {
+                PRegId scratch = scratch_regs.acquire();
+                vreg_to_preg.emplace(vreg_id, scratch);
+                spilled_slot.emplace(vreg_id, SlotId{L.id});
+            }
+        }
+
+        SpillRewriteResult res;
+        res.before.reserve(spilled_uses.size());
+        res.after.reserve(spilled_defs.size());
+
+        // BEFORE: reload spilled uses
+        for (std::size_t vreg_id : spilled_uses) {
+            res.before.emplace_back(LIRLoad{spilled_slot.at(vreg_id), vreg_to_preg.at(vreg_id)}, /*inst_num filled later*/ 0);
+        }
+
+        // Rewrite the instruction itself (both LOC_PREG and LOC_SLOT vregs)
+        rewrite_inst_regs(inst, vreg_to_preg);
+
+        // AFTER: store spilled defs
+        for (std::size_t vreg_id : spilled_defs) {
+            res.after.emplace_back(LIRStore{spilled_slot.at(vreg_id), vreg_to_preg.at(vreg_id)}, /*inst_num filled later*/ 0);
+        }
+
+        return res;
+    }
+
+
+    
+    void add_spilled_to_insts() {
+        for (auto& f : ctx.lir_funcs) {
+            const std::vector<Location>& locs = ctx.locs_by_func(f.id);
+
+            for (auto& b : ctx.lir_blocks(f)) {
+                std::vector<LIRInstruct> new_insts;
+                std::size_t next_inst_num = 0;
+
+                auto emit_one = [&](LIRInstruct& inst) {
+                    SpillRewriteResult r = spill_rewrite_before_after(inst, locs);
+
+                    // emit BEFORE
+                    for (auto& bi : r.before) {
+                        bi.inst_num = next_inst_num;
+                        new_insts.push_back(bi);
+                        next_inst_num += 2;
+                    }
+
+                    // emit rewritten instruction
+                    inst.inst_num = next_inst_num;
+                    new_insts.push_back(inst);
+                    next_inst_num += 2;
+
+                    // emit AFTER
+                    for (auto& ai : r.after) {
+                        ai.inst_num = next_inst_num;
+                        new_insts.push_back(ai);
+                        next_inst_num += 2;
+                    }
+                };
+
+                // Rewrite normal instructions
+                for (const auto& orig_i : ctx.lir_insts(b)) {
+                    LIRInstruct inst = orig_i;
+                    emit_one(inst);
+                }
+
+                // Rewrite terminator (exists only in b.term)
+                assert(b.term.has_value());
+                LIRInstruct term = *b.term;
+
+                // Emit its before/after into b.insts, but keep terminator stored in b.term
+                SpillRewriteResult tr = spill_rewrite_before_after(term, locs);
+
+                // BEFORE for terminator goes into instruction list
+                for (auto& bi : tr.before) {
+                    bi.inst_num = next_inst_num;
+                    new_insts.push_back(bi);
+                    next_inst_num += 2;
+                }
+
+                // Terminator itself stays in b.term
+                term.inst_num = next_inst_num;
+                next_inst_num += 2;
+                b.term = term;
+
+                // AFTER for terminator (usually empty) would be unreachable, but keep it for now
+                for (auto& ai : tr.after) {
+                    ai.inst_num = next_inst_num;
+                    new_insts.push_back(ai);
+                    next_inst_num += 2;
+                }
+
+                b.insts = std::move(new_insts);
+            }
+        }
+    }
+
+
 
 private:
     BackendContext& ctx;
@@ -164,23 +326,23 @@ private:
 
     RegAllocInfo* regalloc;
 
+    static inline void maybe_push_vreg(std::vector<VRegId>& out, const Reg& r) {
+        if (alt<VRegId>(r.id)) out.push_back(get<VRegId>(r.id));
+    }
+
+    static inline void maybe_push_vreg(std::vector<VRegId>& out, const Operand& op) {
+        if (alt<Reg>(op)) maybe_push_vreg(out, get<Reg>(op));
+    }
+
     // Returns set of defined vregs in an instruction.
     std::vector<VRegId> defs(const LIRInstruct& inst) {
         std::vector<VRegId> defined;
 
         std::visit(overloaded{
-            [&](const LIRLoad& load) {
-                defined.push_back(get_vreg(load.dst));
-            },
-            [&](const LIRConst& cons) {
-                defined.push_back(get_vreg(cons.dst));
-            },
-            [&](const LIRBinOp& binop) {
-                defined.push_back(get_vreg(binop.dst));
-            },
-            [&](auto const&) {
-                // no defs
-            }
+            [&](const LIRLoad& load)  { maybe_push_vreg(defined, load.dst); },
+            [&](const LIRConst& cons) { maybe_push_vreg(defined, cons.dst); },
+            [&](const LIRBinOp& binop){ maybe_push_vreg(defined, binop.dst); },
+            [&](auto const&) { /* none */ }
         }, inst.pl);
 
         return defined;
@@ -192,28 +354,21 @@ private:
 
         std::visit(overloaded{
             [&](const LIRBinOp& binop) {
-                if (!ctx.op_is_imm(binop.lhs)) {
-                    Reg reg = std::get<Reg>(binop.lhs);
-                    used.push_back(get_vreg(reg));
-                }
-                if (!ctx.op_is_imm(binop.rhs)) {
-                    Reg reg = std::get<Reg>(binop.rhs);
-                    used.push_back(get_vreg(reg));
-                }
+                maybe_push_vreg(used, binop.lhs);
+                maybe_push_vreg(used, binop.rhs);
             },
             [&](const LIRStore& store) {
-                used.push_back(get_vreg(store.src));
+                maybe_push_vreg(used, store.src);
             },
             [&](const LIRRet& ret) {
-                used.push_back(get_vreg(ret.id));
+                maybe_push_vreg(used, ret.id);
             },
-            [&](auto const&) {
-                // no uses
-            }
+            [&](auto const&) { /* none */ }
         }, inst.pl);
 
         return used;
     }
+
 
     // Insert the 'start' var in an interval [start, end)
     void insert_start_range(VRegId vreg, size_t inst_num) {
@@ -360,4 +515,12 @@ void regalloc(BackendContext& ctx, bool debug) {
     
     // Now actually allocate physical registers using linear scan.
     regalloc.linear_scan_regalloc();
+
+    // Now sub out Vreg -> Preg in instructions, and
+    // Add spill instructions for spills.
+    regalloc.add_spilled_to_insts();
+    if (debug) {
+        std::cout << "\n\n------ Physical register insertion/spill insertion pass ------\n" << std::endl;
+        print_lir(ctx.lir_funcs, std::cout);
+    }
 }

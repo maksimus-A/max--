@@ -50,6 +50,7 @@ set(MAXC_SOURCES
 
     # LIR Gen
     src/codegen/backend/lir/lir_gen.cpp
+    src/codegen/backend/lir/lir_print.cpp
     # CFG Gen
     src/codegen/backend/cfg/cfg_gen.cpp
 

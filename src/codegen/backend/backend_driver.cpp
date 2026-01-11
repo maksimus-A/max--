@@ -11,6 +11,7 @@ extern "C" {
 }
 #include "codegen/backend/ir_walkers.h"
 #include "codegen/backend/lir/lir.hpp"
+#include "codegen/backend/lir/lir_print.hpp"
 #include "codegen/backend/visitors/mir_visitor.hpp"
 #include "codegen/backend/visitors/lir_visitor.hpp"
 
