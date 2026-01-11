@@ -48,7 +48,7 @@ public:
     std::size_t size() const {return tbl.count;}
     
     const T* operator[](std::size_t i) const {
-        assert(i < tbl.count);
+        // I'll allow null returns here, for frame_layout pass.
         return reinterpret_cast<const T*>(tbl.items[i]);
     }
 

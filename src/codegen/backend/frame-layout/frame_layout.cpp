@@ -34,20 +34,23 @@ public:
             size_t cursor = 0;
             std::vector<SlotFrameInfo> slot_map;
             for (size_t i = 0; i < slots_used; i++) {
-                out << "i: " << i << std::endl;
                 // I have made per-function slot id's, stored in the function.
                 // The maximum slot id == next_slot_id.
                 const Symbol* sym = ctx.slot_syms[f.id.id][i];
+                // HACK TO FIX LATER!
+                SizeAlign slot_sa;
                 if (sym == NULL) {
-                    fprintf(stdout, "ERROR: Symbol not found in slot_id table in frame_layout.");
-                    return;
-                }
-                out << "Symbol id: " << sym->id << std::endl;
-                BuiltInType sym_type = sym->type;
-                out << "Symbol type: " << sym_type << std::endl;
+                    if (debug) out << "Slot " << i << ": Symbol not found in table. Assuming new spilled slot, and defaulting to type=8, align=8." <<std::endl;
 
-                // Get alignment/size of symbol (based on symbol type)
-                SizeAlign slot_sa = builtin_type_sizealign[sym_type];
+                    slot_sa = SizeAlign{8, 8};
+                }
+                else {
+                    BuiltInType sym_type = sym->type;
+
+                    // Get alignment/size of symbol (based on symbol type)
+                    slot_sa = builtin_type_sizealign[sym_type];
+                }
+
                 // Set cursor alignment
                 cursor = align_up(cursor, slot_sa.align);
                 // Calculate FP's offset of slot

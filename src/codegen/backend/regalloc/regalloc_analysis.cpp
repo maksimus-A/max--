@@ -98,6 +98,15 @@ public:
 
             // Push to ctx
             ctx.locs.push_back(regalloc.locs);
+
+            // Update new max_slots based on new spilled slots.
+            // TODO*: Will do a 'hack' in frame-layout that just checks
+            // if my slot_sym table is null, and if it is default to type/align 8.
+            // later with more types, store a 'SlotDec' struct that stores that information
+            // earlier per slot, and for new slots, check the instruction type,
+            // and fill the table for new slots. then frame layout can use that
+            // new SlotDesc as the source of truth.
+            f.max_slot_id = regalloc.slot_counter;
             if (debug) print_preg_allocations(regalloc);
         }
     }
@@ -386,7 +395,7 @@ private:
  
     // Insert the 'end' var in an interval [start, end)
     // Needs to create a new interval first.
-    // TODO: Merge intervals since my linear scan algo is lazy. Must-do for now.
+    // TODO**: Merge intervals since my linear scan algo is lazy. Must-do for now.
     void insert_end_range(VRegId vreg, size_t inst_num) {
         Interval& interval = curr_info->intervals[vreg.id];
         if (!interval.ranges.empty()) {
