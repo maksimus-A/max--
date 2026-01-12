@@ -4,4 +4,4 @@ int z = 3;
 
 x = x + y * z;
 
-exit(x);
+exit(x); // 7?

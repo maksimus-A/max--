@@ -106,6 +106,21 @@ public:
         return SIZE_MAX;
     }
 
+    // Frame info stuff
+    inline FrameInfo* get_frame_info_ptr(FuncId fid) {
+        auto& opt = frame_info[fid.id];
+        assert(opt.has_value() && "FrameInfo not initialized for function");
+        return &*opt;
+    }
+
+    inline const LIRInstruct& get_terminator(
+    const std::optional<LIRInstruct>& term)
+    {
+        assert(term.has_value() && "Block has no terminator");
+        return *term;
+    }
+
+
 private:
     const IRModule& mod;
     

@@ -2,7 +2,7 @@
 #include <array>
 #include <cstddef>
 
-#define ARM_FREE_REGS 2
+#define ARM_FREE_REGS 7
 #define ARM_SCRATCH_REGS 2
 
 struct VRegId { std::size_t id; };

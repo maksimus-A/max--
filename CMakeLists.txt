@@ -63,6 +63,8 @@ set(MAXC_SOURCES
 
     # Frame Layout
     src/codegen/backend/frame-layout/frame_layout.cpp
+    # Final ARM emission pass
+    src/codegen/backend/emitter/emitter.cpp
 
     # IR walkers
     src/codegen/backend/ir_walkers.c

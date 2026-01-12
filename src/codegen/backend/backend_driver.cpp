@@ -19,8 +19,8 @@ extern "C" {
 // Essentially "main" for the cpp backend.
 class BackendDriver {
 public:
-    BackendDriver(IRModule* mod, Source* src, Diagnostics* diags, bool debug, BackendContext ctx_)
-        : mod(mod), src(src), diags(diags), debug(debug), ctx(ctx_) {}
+    BackendDriver(IRModule* mod, Source* src, Diagnostics* diags, bool debug, BackendContext ctx_, std::ostream& armout_)
+        : mod(mod), src(src), diags(diags), debug(debug), ctx(ctx_), armout(armout_) {}
 
     void run(Vector* mir_funcs) {
         lower_mir_to_lir(ctx, debug);
@@ -38,6 +38,9 @@ public:
 
         // Constructs frame layouts per function
         run_frame_layout(ctx, debug);
+
+        // Emits ARM into specified file.
+        emit_arch_arm_64(ctx, debug, armout);
     }
 
 private:
@@ -46,13 +49,15 @@ private:
     Diagnostics* diags;
     BackendContext ctx;
     bool debug;
+    std::ostream& armout;
 
 };
 
 extern "C" int run_backend_pipeline(Vector* funcs, IRModule* mod, Arena* a, Diagnostics* diags, Source* source_file, bool debug) {
     try {
+        std::ofstream armout("mxout_new.s");
         BackendContext ctx(*mod);
-        BackendDriver driver(mod, source_file, diags, debug, ctx);
+        BackendDriver driver(mod, source_file, diags, debug, ctx, armout);
         driver.run(funcs);
         return 0; // Success
     } 

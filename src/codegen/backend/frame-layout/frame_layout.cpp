@@ -26,9 +26,6 @@ public:
         for (auto& f: ctx.lir_funcs) {
 
             // Get # of slots
-            // TODO**: this doesn't account for spill slots.
-            // and spill slots don't have a symbol or type.
-            // I need to construct some sort of type table for them.
             size_t slots_used = f.max_slot_id;
             // Define insertion cursor
             size_t cursor = 0;
@@ -67,7 +64,7 @@ public:
             }
             size_t locals_size= align_up(cursor, FP_ALIGN);
             size_t frame_record_size = align_up(16, FP_ALIGN);
-            size_t callee_save_size = 0;
+            size_t callee_save_size = 0; // TODO: remove hack!!
             size_t total_frame_size = align_up(locals_size + frame_record_size + callee_save_size, FP_ALIGN);
             // Assign found values into FrameInfo obj
             FrameInfo frame = FrameInfo(true, true, locals_size, frame_record_size,
@@ -75,18 +72,12 @@ public:
             
             ctx.frame_info[f.id.id] = std::move(frame);
         }
-
     }
 
-
-    void print_slot_frame_info(const std::vector<SlotFrameInfo>& slot_map) {
-        int i = 0;
-        for (const auto& sfi: slot_map) {
-            out << "    Slot " << i;
-            out << " size=" << sfi.size << " align=" << sfi.align << " fp_offset=" << sfi.fp_offset << std::endl;
-            i++;
-        }
+    void add_prologue_epilogue() {
+        
     }
+
 
     void print_frames() {
         for (size_t i = 0; i < ctx.frame_info.size(); i++) {
@@ -111,8 +102,9 @@ public:
             out << "  Slot Information: " << std::endl;
             print_slot_frame_info(frame.slot_map);
         }
-
     }
+
+
 private:
     BackendContext& ctx;
     bool debug;
@@ -124,6 +116,17 @@ private:
 
         return cursor + (align - padding);
     }
+
+        void print_slot_frame_info(const std::vector<SlotFrameInfo>& slot_map) {
+        int i = 0;
+        for (const auto& sfi: slot_map) {
+            out << "    Slot " << i;
+            out << " size=" << sfi.size << " align=" << sfi.align << " fp_offset=" << sfi.fp_offset << std::endl;
+            i++;
+        }
+    }
+
+
 
 };
 

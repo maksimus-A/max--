@@ -19,3 +19,4 @@ const T& get(const Variant& v) {
 }
 
 void run_frame_layout(BackendContext& ctx, bool debug);
+void emit_arch_arm_64(BackendContext& ctx, bool debug, std::ostream& armout);
