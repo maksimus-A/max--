@@ -13,7 +13,7 @@
 #define AST_DEFAULT_CAPACITY 32
 
 // todo: refactor all errors to just use 'Diagnostics'
-void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond);
+static void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond);
 char* alloc_error_ptr(Parser* parser);
 ASTNode* parse_expr(Parser* paresr, Source* source_file, int min_prec);
 
@@ -469,9 +469,9 @@ ASTNode* parse_block_node(Parser* parser, Source* source_file) {
     return block_node;
 }
 
-// Parses builtin function 'exit(<expr>)'.
-// Assumes we start on 'exit' token.
-ASTNode* parse_exit(Parser* parser, Source* source_file) {
+// Parses return statement.
+// Assumes we start on 'return' token.
+ASTNode* parse_return(Parser* parser, Source* source_file) {
 
     ASTNode* exit_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     exit_node->ast_kind = AST_EXIT;
@@ -480,8 +480,6 @@ ASTNode* parse_exit(Parser* parser, Source* source_file) {
     // TODO: Get span of the entire function (usually up to ;)
     // we already verified the next token is '('.
     advance(parser);
-    char* err_msg = alloc_error_ptr(parser);
-    expect(parser, PAREN_START, err_msg);
 
     ASTNode* expr = parse_expr(parser, source_file, 0);
     if (expr->ast_kind == AST_ERROR) return NULL; // todo: error handle better.
@@ -489,12 +487,6 @@ ASTNode* parse_exit(Parser* parser, Source* source_file) {
     exit_node->node_info.exit_info.expr = expr;
 
     // Pointer is after expression now
-    char* err_msg_2 = alloc_error_ptr(parser);
-    if (!expect(parser, PAREN_END, err_msg)) {
-        add_err_msg(parser, err_msg_2, current(parser).line, current(parser).col);
-        sync_to_boundary(parser);
-        return exit_node;
-    }
     char* err_msg_3 = alloc_error_ptr(parser);
     if (!expect(parser, SEMICOLON, err_msg_3)) {
         add_err_msg(parser, err_msg_3, current(parser).line, current(parser).col);
@@ -605,7 +597,9 @@ char* alloc_error_ptr(Parser* parser) {
                     alignof(char));
 }
 
-void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond) {
+// **MAIN HELPER FOR AST PARSING**
+// Parses tokens to create each AST node depending on what is seen.
+static void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond) {
 
     while (current(parser).token_kind != stop_cond && current(parser).token_kind != TOK_EOF) {
         if (starts_decl(parser)) {
@@ -625,7 +619,7 @@ void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum T
                     break;
             }
         }
-        else if (starts_stmt(parser)) {
+        else if (starts_stmt(parser)) {  // Currently supports: assignments, returns.
             switch (current(parser).token_kind) {
                 case IDENTIFIER:
                 {
@@ -640,17 +634,23 @@ void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum T
                     }
                     break;
                 }
+                case RETURN:
+                {
+                    ASTNode* ret = parse_return(parser, source_file);
+                    push_node(parser, list, ret);
+                }
 
                 default: break;
             }
 
         }
+        /*
         else if (starts_builtin_func(parser, source_file)) {
             if (compare_identifier_name(parser, source_file, "exit", 4)) {
                 ASTNode* builtin_exit = parse_exit(parser, source_file);
                 push_node(parser, list, builtin_exit);
             }
-        }
+        }*/
         else if (current(parser).token_kind == CUR_BRACK_START) {
             advance(parser);
             ASTNode* block_node = parse_block_node(parser, source_file);
@@ -668,6 +668,8 @@ void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum T
     }
 }
 
+// **ENTRY POINT**
+// Parses our tokens to create an AST. Recursively calls proper functions to build the AST.
 ASTNode* build_ast(Parser* parser, Source* source_file) {
 
     ASTNode* ast_root = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));

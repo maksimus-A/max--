@@ -16,6 +16,11 @@ typedef enum ASTKind {
     AST_BLOCK,
     AST_EXIT,
     AST_BIN_OP, // binary operators
+    // Control flow stuff
+    AST_COND,
+    AST_IF,
+    AST_THEN,
+    AST_ELSE,
     AST_ERROR
 } ASTKind;
 
@@ -23,7 +28,7 @@ typedef enum BuiltInType {
     // Always add BuiltInType to string list in ast_printer.c
     // AND add to frame_lay.c
     // TODO: Convert internally to SI32. (REMOVE)
-    TYPE_INT, // converts to SI32.
+    TYPE_INT, // converts to SI64.
     TYPE_SI64,
 
     TYPE_BOOL,
