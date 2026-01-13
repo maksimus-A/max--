@@ -13,5 +13,8 @@ entire-workspace.txt
 mx_out.s
 mx_out.out
 
+mxout_new.out
+mxout_new.s
+
 src/codegen/backend_c
 include/codegen/backend_c

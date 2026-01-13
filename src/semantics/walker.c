@@ -120,6 +120,16 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
             }
             break;
         }
+        case AST_IF:
+        {
+            ASTNode* cond = node->node_info.if_stmt.cond;
+            ASTNode* then_block = node->node_info.if_stmt.then_block;
+            ASTNode* else_block = node->node_info.if_stmt.else_block;
+
+            if (cond) walk_node(visitor, user, cond);
+            if (then_block) walk_node(visitor, user, then_block);
+            if (else_block) walk_node(visitor, user, else_block);
+        }
         case AST_BIN_OP:
         {
             ASTNode* LHS = node->node_info.bin_op.LHS;
