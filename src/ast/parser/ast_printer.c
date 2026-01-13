@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "ast/lexer/lexer.h"
 #include "ast/parser/ast.h"
 #include "common.h"
 
@@ -20,7 +21,8 @@ const char* op_string[TOK_COUNT] = {
     [DIV] = "/",
     [EQQ] = "==",
     [NEQ] = "!=",
-    [LESS_THAN] = "<"
+    [LESS_THAN] = "<",
+    [GREATER_THAN] = ">"
 };
 
 char* get_type_string(BuiltInType type) {
@@ -120,11 +122,13 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         }
         case AST_IF:
         {
-            printf("IfStmt id={%d} cond=\n", (int)node->id);
+            printf("IfStmt id={%d}\n", (int)node->id);
             indent++;
             dump_ast(node->node_info.if_stmt.cond, source_file, indent);
             dump_ast(node->node_info.if_stmt.then_block, source_file, indent);
-            if (node->node_info.if_stmt.else_block != NULL) dump_ast(node->node_info.if_stmt.else_block, source_file, indent);
+            if (node->node_info.if_stmt.else_block != NULL) {
+                dump_ast(node->node_info.if_stmt.else_block, source_file, indent);
+            }
             indent--;
             print_indentation(indent);
             printf(")\n");
