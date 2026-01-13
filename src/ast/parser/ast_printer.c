@@ -118,6 +118,18 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             printf(")\n");
             break;
         }
+        case AST_IF:
+        {
+            printf("IfStmt id={%d} cond=\n", (int)node->id);
+            indent++;
+            dump_ast(node->node_info.if_stmt.cond, source_file, indent);
+            dump_ast(node->node_info.if_stmt.then_block, source_file, indent);
+            if (node->node_info.if_stmt.else_block != NULL) dump_ast(node->node_info.if_stmt.else_block, source_file, indent);
+            indent--;
+            print_indentation(indent);
+            printf(")\n");
+            break;
+        }
         case AST_EXIT:
         {
             printf("Exit id={%d}\n", (int)node->id);

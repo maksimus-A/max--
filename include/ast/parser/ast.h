@@ -91,6 +91,12 @@ typedef struct BinaryOperatorInfo {
     ASTNode* RHS;
 }BinOpInfo;
 
+typedef struct IfStmtInfo {
+    ASTNode* cond;
+    ASTNode* then_block;
+    ASTNode* else_block;
+} IfStmtInfo;
+
 //Built-ins
 // Exit
 typedef struct ExitInfo {
@@ -115,6 +121,7 @@ typedef struct ASTNode {
         ExitInfo exit_info;
         AssnStmtInfo assn_stmt;
         BinOpInfo bin_op;
+        IfStmtInfo if_stmt;
     } node_info;
 } ASTNode;
 

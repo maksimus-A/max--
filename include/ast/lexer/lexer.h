@@ -46,6 +46,7 @@ enum TokenKind {
     EQQ, // ==
     NEQ,
     LESS_THAN,
+    GREATER_THAN,
 
     // --- Error token ---
     NO_TOKEN,

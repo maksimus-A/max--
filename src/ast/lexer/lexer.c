@@ -267,6 +267,12 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                     push_token(tokens, token);
                 }
                 break;
+            case '>':
+                {
+                    Token token = set_token(GREATER_THAN, i, line, col, 1);
+                    push_token(tokens, token);
+                }
+                break;
             case '\n':
                 {
                     line++;

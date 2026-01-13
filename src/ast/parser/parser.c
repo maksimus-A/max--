@@ -126,6 +126,7 @@ static bool is_infix(Token token) {
         case PLUS:
         case MINUS:
         case LESS_THAN:
+        case GREATER_THAN:
         case EQQ:
         case NEQ:
             return true;
@@ -138,6 +139,7 @@ static bool is_infix(Token token) {
 // Returns the precedence of the operator token.
 static int precedence(Token token) {
     switch (token.token_kind) {
+        // todo: maybe remove? idk.
         case PAREN_START:
         case PAREN_END:
             return 25;
@@ -148,6 +150,7 @@ static int precedence(Token token) {
         case MINUS:
             return 19;
         case LESS_THAN:
+        case GREATER_THAN:
             return 18;
         case EQQ:
         case NEQ:
@@ -245,6 +248,14 @@ SrcSpan create_span_from(int start_mark, int end_mark) {
     return span;
 }
 
+SrcSpan create_span_curr_token(Parser* parser) {
+    SrcSpan span;
+    span.start = parser->tokens->data[parser->token_index].start;
+    span.length = parser->tokens->data[parser->token_index].length;
+    
+    return span;
+}
+
 /*--------- ERROR RECOVERY ---------*/
 /*Help recover from syntax errors by syncing to
  closest statment boundary or EOF.*/
@@ -252,6 +263,7 @@ int sync_to_boundary(Parser* parser) {
     while (parser->token_index < (int)parser->tokens->count-1) {
         if (starts_stmt(parser)) break;
         else if (current(parser).token_kind == CUR_BRACK_END) break;
+        else if (current(parser).token_kind == CUR_BRACK_START) break;
         else if (match_kind(parser, SEMICOLON)) break;
         parser->token_index++;
     }
@@ -268,6 +280,17 @@ int expect_semicolon_or_recover(Parser* parser) {
     // TODO: This should probably return an error since we reached EOF.
     return parser->token_index;
 }
+
+// Expect specific token. If found, advance cursor. Else, append error message to diagnostics.
+void expect_token(Parser* parser, enum TokenKind kind) {
+    char* err_msg = alloc_error(parser->diags);
+    if (!expect(parser, kind, err_msg)) {
+        add_diag(parser->diags, ERROR, create_span_curr_token(parser), 
+                err_msg, current(parser).line, current(parser).col);
+        sync_to_boundary(parser);
+    }
+}
+
 
 /*--------- PARSING HELPERS ---------*/
 // Converts integer literal string to actual integer
@@ -445,6 +468,7 @@ ASTNode* parse_int_decl(Parser* parser, Source* source_file) {
 }
 
 // Parses statements/decls inside block. Assumes { was consumed.
+// Ends after }.
 ASTNode* parse_block_node(Parser* parser, Source* source_file) {
     ASTNode* block_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     block_node->ast_kind = AST_BLOCK;
@@ -536,6 +560,61 @@ ASTNode* parse_assn(Parser* parser, Source* source_file) {
     }
     return assn_stmt;
 }
+
+// Parses condition; assumes starts inside parentheses.
+// TODO: IDK if this needs to exist.
+ASTNode* parse_cond(Parser* parser, Source* source_file) {
+
+    return NULL;
+}
+
+// Parse if/else, and conditional. Starts at 'IF' token.
+// Assumes if's are followed by blocks, not sole statements.
+ASTNode* parse_if_stmt(Parser* parser, Source* source_file) {
+
+    // Get start of entire if stmt.
+    size_t if_start = current(parser).start;
+
+    advance(parser);
+    // ensure cond is wrapped in ()
+    expect_token(parser, PAREN_START);
+
+    ASTNode* cond = parse_expr(parser, source_file, 0);
+
+    expect_token(parser, PAREN_END);
+    expect_token(parser, CUR_BRACK_START);
+
+    // Parse block node/statements
+    ASTNode* then_block = parse_block_node(parser, source_file);
+
+    // Parse else (if it exists, block only, no 'else if'
+    ASTNode* else_block = NULL;
+    if (match_kind(parser, ELSE)) {
+        // TODO: Doesn't parse 'else if' properly.
+        // needs to support non-blocks after if/else first.
+        expect_token(parser, CUR_BRACK_START);
+        else_block = parse_block_node(parser, source_file);
+    }
+
+    IfStmtInfo if_stmt = (IfStmtInfo) {
+        .cond = cond,
+        .then_block = then_block,
+        .else_block = else_block
+    };
+
+    // Get 'end' of if statement.
+    size_t if_end = current(parser).start;
+
+    ASTNode* if_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+    if_node->ast_kind = AST_IF;
+    if_node->id = parser->curr_id++;
+    if_node->span = create_span_from(if_start, if_end);
+    if_node->node_info.if_stmt = if_stmt;
+    
+    return if_node;
+}
+
+
 
 /*------ ITEM HELPER ------ */
 void ensure_item_capacity(Parser* parser, NodeList* list) {
@@ -638,6 +717,13 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
                 {
                     ASTNode* ret = parse_return(parser, source_file);
                     push_node(parser, list, ret);
+                    break;
+                }
+                case IF:
+                {
+                    ASTNode* if_stmt = parse_if_stmt(parser, source_file);
+                    push_node(parser, list, if_stmt);
+                    break;
                 }
 
                 default: break;

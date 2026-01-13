@@ -1,9 +1,9 @@
 int x = 1;
+int y = 3;
 if (x < 1) {
-    x = 0;
+    x = y;
 }
 else {
     x = 2;
 }
-//exit(x);
 return x;

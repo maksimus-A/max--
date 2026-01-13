@@ -180,6 +180,8 @@ int main(int argc, char **argv) {
         printf("------------- AST -------------\n");
         dump_ast(ast_root, &source_file, 0);
     }
+    // TODO: Remove old parser errs, switch fully to diags. Some uses it some don't.
+    if (print_errors(&diags, "AST BUILDER:\n")) return 3;
 
     /*------ Semantic passes ------*/
 
@@ -189,13 +191,13 @@ int main(int argc, char **argv) {
     resolver_init(&resolver, &arena, &diags, &source_file, args.debug);
     run_resolver(ast_root, &resolver);
 
-    if (print_errors(&diags)) return 4;
+    if (print_errors(&diags, "RESOLVER:\n")) return 4;
 
     DefAssn defassn;
     definite_assignment_init(&defassn, &diags, &arena, &source_file, args.debug, resolver.curr_id);
     run_definite_assignment(ast_root, &defassn);
 
-    if (print_errors(&diags)) return 5;
+    if (print_errors(&diags, "DEFINITE_ASSN:\n")) return 5;
 
     // max-- IR generation
     IRBuilder builder;

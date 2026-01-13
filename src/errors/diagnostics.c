@@ -84,8 +84,10 @@ void create_and_add_diag_fmt(Diagnostics* diags, Severity sev, SrcSpan span, con
     add_diag(diags, sev, span, err_msg, line_col.line, line_col.col);
 }
 
-bool print_errors(Diagnostics* diags) {
+bool print_errors(Diagnostics* diags, const char* pass) {
     if (diags->count == 0) return false;
+    
+    fprintf(stderr, "%s", pass);
     for (int i = 0; i < diags->count; i++) {
         char* severity = diags->items[i]->severity == ERROR ? "ERROR:" : "WARN";
         fprintf(stderr, "%s %s\n", severity, diags->items[i]->err_msg);

@@ -23,8 +23,7 @@ int s = r + 1034;
 int t = s + 5;
 
 r = a + b * c/d - e + 13 * (a+b+c+d+e);
-return r;
-//exit(r); // should return 34
+return r; // should return 34
 
 
 // int i = (x + y * z) / x;    // 6 + (2*8) / 2 = (6 + 16) / 2 = 22 / 2 = 11

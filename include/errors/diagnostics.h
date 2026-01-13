@@ -34,4 +34,4 @@ void diags_init(Diagnostics* diags, Arena* arena, size_t capacity);
 
 char* alloc_error(Diagnostics* diags);
 
-bool print_errors(Diagnostics* diags);
+bool print_errors(Diagnostics* diags, const char* pass);
