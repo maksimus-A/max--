@@ -93,6 +93,21 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
 
             break;
         }
+        case AST_CMP_OP:
+        {
+            // identical to above except it prints cmpop lol.
+            printf("CmpOp id={%zu} operator={%s", node->id, op_string[node->node_info.bin_op.op.token_kind]);
+            printf("}\n");
+            indent++;
+            // Print LHS/RHS
+            dump_ast(node->node_info.bin_op.LHS, source_file, indent);
+            dump_ast(node->node_info.bin_op.RHS, source_file, indent);
+            indent--;
+            print_indentation(indent);
+            printf(")\n");
+
+            break;
+        }
         case AST_BLOCK:
         {
             printf("Block id={%d}\n", (int)node->id);

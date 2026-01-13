@@ -361,6 +361,17 @@ ASTNode* parse_primary(Parser* parser, Source* source_file) {
     return expr;
 }
 
+bool binop_is_cmp(Token op) {
+    switch (op.token_kind) {
+        case EQQ:
+        case NEQ:
+        case LESS_THAN:
+        case GREATER_THAN:
+            return true;
+        default: return false;
+    }
+}
+
 // Pratt parses expression, moves pointer to end of expr.
 // Assumes pointer is at start of expression.
 // todo: add error handling.
@@ -390,9 +401,13 @@ ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
         ASTNode* new_lhs = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
         new_lhs->ast_kind = AST_ERROR;
 
+        ASTKind binop_kind;
+        if (binop_is_cmp(op)) binop_kind = AST_CMP_OP;
+        else binop_kind = AST_BIN_OP;
+
         // Create binary expression node
         *new_lhs= (ASTNode) {
-            .ast_kind = AST_BIN_OP,
+            .ast_kind = binop_kind,
             .id = parser->curr_id,
             .node_info.bin_op = bin_op,
             .span = bin_span
