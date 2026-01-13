@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -79,13 +80,14 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
     // All the children nodes, while the visitor takes care of
     // Actually implementing what happens during each node.
     // So.. I guess... Just recursively traverse the list? DFS?
+    WalkChildren walk_children = WALK_UNSET;
     if (node == NULL) return;
-    if (visitor->pre) visitor->pre(user, node);
+    if (visitor->pre) walk_children = visitor->pre(user, node);
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
             NodeList* program_list = get_item_list(node);
-            if (!nodelist_is_empty(program_list)) {
+            if (!nodelist_is_empty(program_list) && walk_children == WALK_CHILDREN) {
                 for (int i = 0; i < program_list->count; i++) {
                     walk_node(visitor, user, program_list->items[i]);
                 }
@@ -95,47 +97,69 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
         case AST_VAR_DEC:
         {
             ASTNode* expr = get_child_expr(node);
-            if (expr) walk_node(visitor, user, expr);
+            if (expr && walk_children == WALK_CHILDREN) 
+                walk_node(visitor, user, expr);
             break;
         }
         case AST_ASSN:
         {
             ASTNode* expr = get_child_expr(node);
-            if (expr) walk_node(visitor, user, expr);
+            if (expr && walk_children == WALK_CHILDREN) 
+                walk_node(visitor, user, expr);
             break;
         }
         case AST_EXIT:
         {
             ASTNode* expr = get_child_expr(node);
-            if (expr) walk_node(visitor, user,expr);
+            if (expr && walk_children == WALK_CHILDREN) 
+                walk_node(visitor, user,expr);
             break;
         }
         case AST_BLOCK:
         {
             NodeList* block_list = get_item_list(node);
-            if (!nodelist_is_empty(block_list)) {
+            if (!nodelist_is_empty(block_list) && walk_children == WALK_CHILDREN) {
                 for (int i = 0; i < block_list->count; i++) {
                     walk_node(visitor, user, block_list->items[i]);
                 }
             }
             break;
         }
+        case AST_BIN_OP:
+        case AST_CMP_OP:
+        {
+            if (walk_children == WALK_CHILDREN) {
+                ASTNode* LHS = node->node_info.bin_op.LHS;
+                ASTNode* RHS = node->node_info.bin_op.RHS;
+
+                assert(LHS && RHS);
+                assert(LHS != node);
+                assert(RHS != node);
+
+                if (LHS != NULL) walk_node(visitor, user, LHS);
+                else fprintf(stdout, "ERROR: LHS of BIN/CMP OP not found.");
+                if (RHS != NULL) walk_node(visitor, user, RHS);
+                else fprintf(stdout, "ERROR: RHS of BIN/CMP OP not found.");
+
+            }
+            break;
+        }
         case AST_IF:
         {
-            ASTNode* cond = node->node_info.if_stmt.cond;
-            ASTNode* then_block = node->node_info.if_stmt.then_block;
-            ASTNode* else_block = node->node_info.if_stmt.else_block;
+            if (walk_children == WALK_CHILDREN) {
+                ASTNode* cond = node->node_info.if_stmt.cond;
+                assert(cond != NULL);
+                walk_node(visitor, user, cond);
 
-            if (cond) walk_node(visitor, user, cond);
-            if (then_block) walk_node(visitor, user, then_block);
-            if (else_block) walk_node(visitor, user, else_block);
-        }
-        case AST_BIN_OP:
-        {
-            ASTNode* LHS = node->node_info.bin_op.LHS;
-            ASTNode* RHS = node->node_info.bin_op.RHS;
-            walk_node(visitor, user, LHS);
-            walk_node(visitor, user, RHS);
+                ASTNode* then_block = node->node_info.if_stmt.then_block;
+                assert(then_block != NULL);
+                walk_node(visitor, user, then_block);
+
+                // Else is allowed to be null.
+                ASTNode* else_block = node->node_info.if_stmt.else_block;
+                if (else_block != NULL) walk_node(visitor, user, else_block);
+            }
+            break;
         }
         case AST_INT_LIT:
         {

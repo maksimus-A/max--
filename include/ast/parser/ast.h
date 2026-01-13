@@ -121,7 +121,7 @@ typedef struct ASTNode {
         BlockInfo block_info;
         ExitInfo exit_info;
         AssnStmtInfo assn_stmt;
-        BinOpInfo bin_op;
+        BinOpInfo bin_op; // also for cmpop
         IfStmtInfo if_stmt;
     } node_info;
 } ASTNode;

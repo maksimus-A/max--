@@ -53,7 +53,7 @@ Symbol* get_symbol(Scope* scope, SrcSpan span, Resolver* resolver) {
 
 // Hook that runs before visiting a node/its children.
 // user = Resolver
-void resolver_pre(void* user, ASTNode* node) {
+WalkChildren resolver_pre(void* user, ASTNode* node) {
     // todo: add 'WARN' if we see 'int x = x;'
     Resolver* resolver = (Resolver*)user;
     switch (node->ast_kind) {
@@ -162,6 +162,7 @@ void resolver_pre(void* user, ASTNode* node) {
 
         default: break;
     }
+    return WALK_CHILDREN;
 }
 
 // Hook that runs after visiting a node.

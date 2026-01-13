@@ -13,11 +13,17 @@ typedef enum IRInstructType {
     IR_STORE,
     IR_LOAD,
     IR_BINOP,
+    IR_CMPOP, // comparison operation
+    // Terminators.
+    IR_JUMP, // unconditional branch/jump
+    IR_BRANCH_IF_ZERO,
     // todo: move this to IRTerminator list.
-    IR_HALT // terminates program with status code. (currently exit(0))
+    IR_HALT, // terminates program with status code. (currently return 0;)
     // no instructions allowed after exit.
+    IR_UNDEFINED
 } IRInstructType;
 
+// TODO: UNUSED
 typedef enum IRTerminator {
     IR_TERM_RETURN,
     IR_TERM_UBR, // unconditional branch
@@ -33,6 +39,10 @@ typedef struct TempId {
     size_t id;
     BuiltInType type;
 } TempId;
+
+typedef struct BlockId {
+    size_t id;
+} BlockId;
 
 typedef enum IRValueKind {
     IRVAL_TEMP,
@@ -88,8 +98,10 @@ typedef struct BinOp {
 // Comparisons
 typedef enum {
     CMP_LT,
+    CMP_GT,
     CMP_EQ,
-    CMP_NE,
+    CMP_NEQ,
+    CMP_ERR
     // later: CMP_LE, CMP_GT, CMP_GE
 } CmpKind;
 
@@ -99,6 +111,17 @@ typedef struct Compare {
     IRValue rhs;
     CmpKind kind;
 } Cmp;
+
+// Branches to 0 if cmp == 0; branches to non-zero if cmp != 0.
+typedef struct Branch {
+    IRValue cmp;
+    BlockId non_zero;
+    BlockId zero;
+} Branch;
+
+typedef struct Jump {
+    BlockId jump_to;
+} Jump;
 /* ------ Instruction payloads ------*/
 
 // Each "vector" will be cast to the proper type
@@ -109,11 +132,16 @@ typedef struct IRInstruct {
     union inst_payload {
         Store store_payload;
         Load load_payload;
-        Halt halt_payload;
+
 
         // Operations
         BinOp binop_pl;
         Cmp cmp_pl; // todo: unused
+
+        // Terminator payloads
+        Halt halt_payload;
+        Branch br_pl;
+        Jump jump_pl;
     } payload;
 
     size_t ast_id;
@@ -121,15 +149,18 @@ typedef struct IRInstruct {
 
 } IRInstruct;
 
-typedef struct BlockId {
-    size_t id;
-} BlockId;
+
 
 typedef struct IRBlock {
     // list of instructions
     // Vector<IRInstruct>
     Vector instructions;
     BlockId id;
+
+    IRInstruct term; // TODO: Refactor LIR gen to see this/use this.
+
+    Vector preds; // BlockId's
+    Vector succs; // BlockId's
 } IRBlock;
 
 typedef struct FuncId {

@@ -28,7 +28,7 @@ void assign_variable(uint64_t* assigned, size_t var_id) {
 }
 
 
-void def_assn_pre(void* user, ASTNode* node) {
+WalkChildren def_assn_pre(void* user, ASTNode* node) {
     DefAssn* defassn = (DefAssn*)user;
 
     switch (node->ast_kind) {
@@ -44,6 +44,7 @@ void def_assn_pre(void* user, ASTNode* node) {
         }
         default: break;
     }
+    return WALK_CHILDREN;
 }
 
 void def_assn_post(void* user, ASTNode* node) {

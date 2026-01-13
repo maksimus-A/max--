@@ -52,6 +52,7 @@ public:
             case IR_STORE: create_store(inst); break;
             case IR_HALT: create_ret(inst); break;
             case IR_BINOP: create_binop(inst); break;
+            default: out << "WARN: MIR -> LIR conversion for op not implemented."; break;
         }
     }
 

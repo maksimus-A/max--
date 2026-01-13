@@ -1,5 +1,6 @@
 #include "codegen/ir-gen/mir.h"
 #include "arena/arena.h"
+#include "ast/lexer/lexer.h"
 #include "ast/parser/ast.h"
 #include "common.h"
 #include "semantics/walker.h"
@@ -10,6 +11,9 @@
 TempId create_temp_id(IRBuilder* builder);
 bool emit_load(IRBuilder* builder, ASTNode* node, TempId dst, SlotId src);
 SlotId get_symbol_id_id(IRBuilder* builder, ASTNode* node);
+static IRValue lower_expr(IRBuilder* builder, ASTNode* expr);
+static void lower_stmt(IRBuilder* builder, ASTNode* stmt);
+void print_value_stack(FILE* output, IRBuilder* builder, ASTNode* node);
 
 // Grabs n-th function in function list.
 IRFunction* get_nth_func(Vector* funcs, int i) {
@@ -44,7 +48,7 @@ IRInstruct* get_nth_instruction(IRBlock* block, int i) {
 
 // Insert instruction into proper placement in builder
 // (should be holding a pointer to current func/block).
-bool insert_instruction(IRBuilder* builder, IRInstruct inst) {
+static bool insert_instruction(IRBuilder* builder, IRInstruct inst) {
     // bounds checks
     if (builder->curr_block_index == SIZE_MAX) return false;
     if (builder->curr_func_index == SIZE_MAX) return false;
@@ -61,13 +65,29 @@ bool insert_instruction(IRBuilder* builder, IRInstruct inst) {
     return true;
 }
 
+static bool insert_terminator(IRBuilder* builder, IRInstruct inst) {
+    // bounds checks
+    if (builder->curr_block_index == SIZE_MAX) return false;
+    if (builder->curr_func_index == SIZE_MAX) return false;
+    if (builder->curr_func_index >= builder->funcs.count) return false;
+    // use macro to get pointer to current IRFunc element
+    IRFunction* f = get_curr_func(builder);
+    if (builder->curr_block_index >= f->blocks.count) return false;
+
+    // use macro to get pointer to current IRBlock element
+    IRBlock* b = get_curr_block(builder, f);
+    // Add terminator to current block.
+    b->term = inst;
+
+    return true;
+}
+
 
 
 /*------ AST Node -> IR Value/Slot conversion ------*/
 
 // Currently supports turning immediates and variables
 // into IR values, and emits a load into temp.
-// todo: rename to emit_rvalue
 IRValue emit_rvalue(IRBuilder* builder, ASTNode* node) {
     // TODO*: Be explicit this emits a load (for your future self).
     IRValue val = {0};
@@ -106,6 +126,8 @@ SlotId get_symbol_id_id(IRBuilder* builder, ASTNode* node) {
     switch (node->ast_kind) {
         case (AST_NAME):
         {
+            assert(node->node_info.var_name.resolved_sym && "unresolved identifier in MIR gen");
+
             slot_id.id = node->node_info.var_name.resolved_sym->id;
             break;
         }
@@ -151,10 +173,22 @@ static BinOpKind get_binop_kind(ASTNode* node) {
         case DIV: {
             // TODO: This is complicated. I need to propogate the type
             // of the whole operation to LHS/RHS or something; need a way
-            // to know what the type is. For now it'll always be UDIV.
+            // to know what the type is. For now it'll always be SDIV.
             return BIN_SDIV;
         }
         default: return BIN_ERROR;
+    }
+}
+
+static CmpKind get_cmp_kind(ASTNode* node) {
+
+    Token op = node->node_info.bin_op.op;
+    switch (op.token_kind) {
+        case LESS_THAN: return CMP_LT;
+        case GREATER_THAN: return CMP_GT;
+        case EQQ: return CMP_EQ;
+        case NEQ: return CMP_NEQ;
+        default: return CMP_ERR;
     }
 }
 
@@ -181,7 +215,8 @@ bool emit_store(IRBuilder* builder, ASTNode* node, SlotId dst, IRValue src) {
         .span = node->span,
     };
     if (!insert_instruction(builder, store_inst)) {
-        fprintf(stderr, "Failed to insert 'store' instruction into builder.");
+        add_diag(builder->diags, ERROR, node->span, 
+        "Failed to insert 'store' instruction into builder.", 0, 0);
         return false;
     }
     return true;
@@ -199,7 +234,8 @@ bool emit_load(IRBuilder* builder, ASTNode* node, TempId dst, SlotId src) {
         .span = node->span,
     };
     if (!insert_instruction(builder, load_inst)) {
-        fprintf(stderr, "Failed to insert 'load' instruction into builder.");
+        add_diag(builder->diags, ERROR, node->span, 
+        "Failed to insert 'load' instruction into builder.", 0, 0);
         return false;
     }
     return true;
@@ -226,7 +262,35 @@ static bool emit_binop(IRBuilder* builder, ASTNode* node, TempId dst, IRValue lh
     };
 
     if (!insert_instruction(builder, binop_inst)) {
-        fprintf(stderr, "Failed to insert 'bin_op' instruction into builder.");
+        add_diag(builder->diags, ERROR, node->span, 
+        "Failed to insert 'bin_op' instruction into builder.", 0, 0);
+        return false;
+    }
+    return true;
+}
+
+// Comparison operation.
+static bool emit_cmpop(IRBuilder* builder, ASTNode* node, TempId dst, IRValue lhs, IRValue rhs) {
+    // grab LHS/RHS from node, store them into op with opkind
+    CmpKind cmp_kind = get_cmp_kind(node);
+
+    Cmp cmp = (Cmp) {
+        .dst = dst,
+        .kind = cmp_kind,
+        .lhs = lhs,
+        .rhs = rhs,
+    };
+
+    IRInstruct cmp_inst = (IRInstruct) {
+        .type = IR_CMPOP,
+        .ast_id = node->id,
+        .span = node->span,
+        .payload.cmp_pl = cmp
+    };
+
+    if (!insert_instruction(builder, cmp_inst)) {
+        add_diag(builder->diags, ERROR, node->span, 
+        "Failed to insert 'cmp' instruction into builder.", 0, 0);
         return false;
     }
     return true;
@@ -243,24 +307,91 @@ bool emit_halt(IRBuilder* builder, ASTNode* node, IRValue ir_val) {
         .payload.halt_payload = halt,
         .span = node->span,
     };
-    if (!insert_instruction(builder, halt_inst)) {
-        fprintf(stderr, "Failed to insert 'halt' instruction into builder.");
+    if (!insert_terminator(builder, halt_inst)) {
+        add_diag(builder->diags, ERROR, node->span, 
+        "Failed to insert 'halt' instruction into builder.", 0, 0);
+        return false;
+    }
+    return true;
+}
+
+bool emit_branch_if_zero(IRBuilder* builder, ASTNode* node, IRValue cmp, BlockId then_id, BlockId else_join_id) {
+
+    Branch br = (Branch) {
+        .cmp = cmp,
+        .zero = else_join_id,
+        .non_zero = then_id
+    };
+
+    IRInstruct branch_inst = (IRInstruct) {
+        .type = IR_BRANCH_IF_ZERO,
+        .span = node->span,
+        .ast_id = node->id,
+        .payload.br_pl = br
+    };
+    if (!insert_terminator(builder, branch_inst)) {
+        add_diag(builder->diags, ERROR, node->span, 
+        "Failed to insert 'br' instruction into builder.", 0, 0);
+        return false;
+    }
+    return true;
+
+}
+
+bool emit_jump(IRBuilder* builder, ASTNode* node, BlockId jump_to) {
+    Jump jump = (Jump) {
+        .jump_to = jump_to
+    };
+
+    IRInstruct jump_inst = (IRInstruct) {
+        .type = IR_JUMP,
+        .span = node->span,
+        .ast_id = node->id,
+        .payload.jump_pl = jump
+    };
+    if (!insert_terminator(builder, jump_inst)) {
+        add_diag(builder->diags, ERROR, node->span, 
+        "Failed to insert 'jump' instruction into builder.", 0, 0);
         return false;
     }
     return true;
 }
 /*------ Instruction Emissions ------*/
 
+
 /*------ Initializations ------*/
 
-IRBlock block_init(IRBuilder* builder) {
-    IRBlock block = {0};
-    block.id = builder->next_block_id;
-    builder->next_block_id.id++;
+// Initializes a new block, sets its blockid==vec_index, and pushes
+// the block into our current function.
+BlockId block_init(IRBuilder* b) {
+    IRFunction* f = get_curr_func(b);
 
-    VEC_INIT_T(&block.instructions, builder->arena, IRInstruct);
+    assert(f && "no current function in block_init");
 
-    return block;
+    IRBlock blk = {0};
+    blk.id.id = f->blocks.count;     // <-- next index
+    blk.term.type = IR_UNDEFINED;
+    VEC_INIT_T(&blk.instructions, b->arena, IRInstruct);
+    VEC_INIT_T(&blk.preds, b->arena, BlockId);
+    VEC_INIT_T(&blk.succs, b->arena, BlockId);
+
+    VEC_PUSH_T(&f->blocks, blk);
+    return blk.id;
+}
+
+BlockId block_init_in_func(IRBuilder* b, IRFunction* f) {
+
+    assert(f && "no current function in block_init");
+
+    IRBlock blk = {0};
+    blk.id.id = f->blocks.count;     // <-- next index
+    blk.term.type = IR_UNDEFINED;
+    VEC_INIT_T(&blk.instructions, b->arena, IRInstruct);
+    VEC_INIT_T(&blk.preds, b->arena, BlockId);
+    VEC_INIT_T(&blk.succs, b->arena, BlockId);
+
+    VEC_PUSH_T(&f->blocks, blk);
+    return blk.id;
 }
 
 // Initializes an IRFunction, including an entry block,
@@ -273,10 +404,8 @@ void begin_function(IRBuilder* builder) {
     // Declare entry block
     func.entry = (BlockId) {.id = 0};
     // Create block
-    IRBlock block = {0};
-    block = block_init(builder);
-    // Set block as 1st in block vec
-    VEC_PUSH_T(&func.blocks, block);
+    BlockId block_id = block_init_in_func(builder, &func);
+
     // Set function id & increment
     size_t func_id = builder->funcs.count;
     func.id.id = func_id;
@@ -296,7 +425,7 @@ void begin_function(IRBuilder* builder) {
 /*------ Initializations ------*/
 
 /* Visitor Hooks*/
-void mir_gen_pre(void* user, ASTNode* node) {
+WalkChildren mir_gen_pre(void* user, ASTNode* node) {
     IRBuilder* builder = (IRBuilder*) user;
 
     switch (node->ast_kind) {
@@ -306,8 +435,73 @@ void mir_gen_pre(void* user, ASTNode* node) {
             begin_function(builder);
             break;
         }
+        case AST_IF:
+        {
+            // First compute condition into a temp (and emit cmp op)
+            IRValue cond_val = lower_expr(builder, node->node_info.if_stmt.cond);
+
+            // Now create branch op.
+
+            IRFunction* f = get_curr_func(builder);
+
+            // Create then, else, join blocks
+
+
+            BlockId then_block_id = block_init(builder);
+            size_t then_idx = then_block_id.id;
+
+            BlockId else_block_id;
+            size_t else_idx = SIZE_MAX;
+            // Check if else-node exists
+            ASTNode* else_node = node->node_info.if_stmt.else_block;
+            if (else_node) {
+                else_block_id = block_init(builder);
+                else_idx = else_block_id.id;
+            }
+
+            BlockId join_block_id = block_init(builder);
+            size_t join_idx = join_block_id.id;
+
+            // Fetch BlockId's for branch op
+            BlockId nonzero_block_id = else_node == NULL ? join_block_id : else_block_id;
+
+            // Emit branch op in current block.
+            emit_branch_if_zero(builder, node, cond_val, then_block_id, nonzero_block_id);
+
+            // TODO: Build preds/succs list after this construction is done.
+
+            // Now we must process statements per-new block that exists.
+
+            // Then block termination
+            builder->curr_block_index = then_block_id.id;
+            lower_stmt(builder, node->node_info.if_stmt.then_block);
+            // If no terminator, insert a jump to 'join'.
+            if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
+                emit_jump(builder, node, join_block_id);
+            }
+
+            // Else block termination
+            if (else_node != NULL) {
+                builder->curr_block_index = else_block_id.id;
+                lower_stmt(builder, node->node_info.if_stmt.else_block);
+                if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
+                    // If no terminator, insert a jump to 'join'.
+                    emit_jump(builder, node, join_block_id);
+                }
+            }
+
+            // My understanding is if I set the curr_block to join_block,
+            // The over-arching walker of the entire AST from 'Program' will take back over,
+            // and insert instructions into the proper block here.
+            // So i think this is all.
+            builder->curr_block_index = join_block_id.id;
+
+            return SKIP_CHILDREN;
+            break;
+        }
         default: break;
     }
+    return WALK_CHILDREN;
 }
 
 void mir_gen_post(void* user, ASTNode* node) {
@@ -368,13 +562,16 @@ void mir_gen_post(void* user, ASTNode* node) {
             break;
         }
         case AST_BIN_OP:
+        case AST_CMP_OP:
         {
             // Emits bin op based on stack variables.
             IRValue* prhs = (IRValue*)vec_pop(&builder->val_stack);
             IRValue* plhs = (IRValue*)vec_pop(&builder->val_stack);
 
             if (!prhs || !plhs) {
-                fprintf(stderr, "ERROR: not enough values for binop\n");
+                add_diag(builder->diags, ERROR, node->span, 
+                "ERROR: not enough values for binop/cmp", 0, 0);
+                fprintf(stderr, "ERROR: not enough values for binop/cmp\n");
                 break;
             }
 
@@ -387,7 +584,8 @@ void mir_gen_post(void* user, ASTNode* node) {
             // now create new temp?
             TempId temp = create_temp_id(builder);
 
-            emit_binop(builder, node, temp, lhs, rhs);
+            if (node->ast_kind == AST_BIN_OP) emit_binop(builder, node, temp, lhs, rhs);
+            if (node->ast_kind == AST_CMP_OP) emit_cmpop(builder, node, temp, lhs, rhs);
 
             // Push IRValue onto stack
             IRValue val = (IRValue) {
@@ -397,6 +595,7 @@ void mir_gen_post(void* user, ASTNode* node) {
             VEC_PUSH_T(&builder->val_stack, val);
             break;
         }
+        // Leaf nodes.
         case AST_INT_LIT:
         {
             // TODO: AST_INT_LIT should really store its type too.
@@ -428,6 +627,7 @@ void mir_gen_post(void* user, ASTNode* node) {
 
         default: break;
     }
+    print_value_stack(stdout, builder, node);
 }
 
 Visitor mir_gen_visitor = {
@@ -435,6 +635,29 @@ Visitor mir_gen_visitor = {
     .post = mir_gen_post
 };
 
+/*------ Helpers ------*/
+
+// Walks sub-tree of tree, starting from 'expr'
+// Returns an IRVal after computing expression vals.
+static IRValue lower_expr(IRBuilder* builder, ASTNode* expr) {
+    // Computes value of expression
+    walk_node(&mir_gen_visitor, builder, expr);
+
+    // Gets expression value from value stack
+    IRValue expr_val = get_ir_value_stack(builder);
+
+    return expr_val;
+}
+
+// Walks sub-tree of tree, starting from 'stmt'.
+static void lower_stmt(IRBuilder* builder, ASTNode* stmt) {
+    size_t stack_size = builder->val_stack.count;
+    walk_node(&mir_gen_visitor, builder, stmt);
+
+    assert(builder->val_stack.count == stack_size);
+}
+
+// Main call function.
 void run_mir_gen(ASTNode* ast_root, IRBuilder* builder) {
     walk_node(&mir_gen_visitor, builder, ast_root);
 }
@@ -457,6 +680,26 @@ void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags, Semantic
 
 /*------ MIR PRINTING ------*/
 
+void print_value_stack(FILE* output, IRBuilder* builder, ASTNode* node) {
+    fprintf(output, "AST Kind: %d, node_id: %zu\n", node->ast_kind, node->id);
+    fprintf(output, "VAL STACK:\n");
+    for (int i = 0; i < builder->val_stack.count; i++) {
+        const IRValue* val = VEC_AT_PTR_T(&builder->val_stack, IRValue, i);
+        if (val->value_kind == IRVAL_IMM) {
+            fprintf(output, "%d: %llu\n", i, val->value_id.imm);
+        }
+        else if (val->value_kind == IRVAL_TEMP) {
+            fprintf(output, "%d: t%zu\n", i, val->value_id.temp_id.id);
+        }
+        
+    }
+    fprintf(output, "\n\n");
+}
+
+void print_block_label(FILE* output, FuncId fid, BlockId bid) {
+    fprintf(output, "block_%zu_%zu", fid.id, bid.id);
+}
+
 void print_op(BinOpKind kind, FILE* output) {
     char* op_name;
     switch (kind) {
@@ -468,6 +711,18 @@ void print_op(BinOpKind kind, FILE* output) {
         case BIN_ERROR: op_name = "NO_OP_FOUND "; break;
     }
     fprintf(output, "%s", op_name);
+}
+
+void print_cmp(CmpKind kind, FILE* output) {
+    char* cmp_name;
+    switch (kind) {
+        case CMP_EQ: cmp_name = "cmp_eq "; break;
+        case CMP_NEQ: cmp_name = "cmp_neq "; break;
+        case CMP_GT: cmp_name = "cmp_gt "; break;
+        case CMP_LT: cmp_name = "cmp_lt "; break;
+        case CMP_ERR: cmp_name = "NO_CMP_FOUND "; break;
+    }
+    fprintf(output, "%s", cmp_name);
 }
 
 void print_slot(IRBuilder* builder, size_t symbol_id, FILE* output) {
@@ -490,7 +745,7 @@ void print_slot_with_id(IRBuilder* builder, size_t symbol_id, FILE* output) {
     fprintf(output, ":%zu)", symbol_id);
 }
 
-void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output) {
+void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, FuncId fid) {
     switch (instr->type) {
         case IR_LOAD:
         {
@@ -517,17 +772,6 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output) {
             }
             break;
         }
-        case IR_HALT:
-        {
-            Halt halt = instr->payload.halt_payload;
-            if (halt.code.value_kind == IRVAL_IMM) {
-                fprintf(output, "halt %lld", halt.code.value_id.imm);
-            }
-            else if (halt.code.value_kind == IRVAL_TEMP) {
-                fprintf(output, "halt t%zu", halt.code.value_id.temp_id.id);
-            }
-            break;
-        }
         case IR_BINOP:
         {
             BinOp binop = instr->payload.binop_pl;
@@ -551,8 +795,68 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output) {
             }
             break;
         }
+        case IR_CMPOP:
+        {
+            Cmp cmp = instr->payload.cmp_pl;
+            print_cmp(cmp.kind, output);
 
-        default: break;
+            // Print destination
+            fprintf(output, "t%zu, ", cmp.dst.id);
+
+            if (cmp.lhs.value_kind == IRVAL_IMM) {
+                fprintf(output, "%lld, ", cmp.lhs.value_id.imm);
+            }
+            else if (cmp.lhs.value_kind == IRVAL_TEMP) {
+                fprintf(output, "t%zu, ", cmp.lhs.value_id.temp_id.id);
+            }
+
+            if (cmp.rhs.value_kind == IRVAL_IMM) {
+                fprintf(output, "%lld", cmp.rhs.value_id.imm);
+            }
+            else if (cmp.rhs.value_kind == IRVAL_TEMP) {
+                fprintf(output, "t%zu", cmp.rhs.value_id.temp_id.id);
+            }
+            break;
+        }
+        // TERMINATORS
+        case IR_HALT:
+        {
+            Halt halt = instr->payload.halt_payload;
+            if (halt.code.value_kind == IRVAL_IMM) {
+                fprintf(output, "halt %lld", halt.code.value_id.imm);
+            }
+            else if (halt.code.value_kind == IRVAL_TEMP) {
+                fprintf(output, "halt t%zu", halt.code.value_id.temp_id.id);
+            }
+            break;
+        }
+        case IR_BRANCH_IF_ZERO:
+        {
+            Branch br = instr->payload.br_pl;
+            if (br.cmp.value_kind == IRVAL_IMM) {
+                fprintf(output, "branch %lld ", br.cmp.value_id.imm);
+            }
+            else if (br.cmp.value_kind == IRVAL_TEMP) {
+                fprintf(output, "branch t%zu ", br.cmp.value_id.temp_id.id);
+            }
+            print_block_label(output, fid, br.non_zero); // true br
+            fprintf(output, " ");
+            print_block_label(output, fid, br.zero); // false br
+
+            break;
+        }
+        case IR_JUMP:
+        {
+            Jump jump = instr->payload.jump_pl;
+            fprintf(output, "jump ");
+            print_block_label(output, fid, jump.jump_to);
+            break;
+        }
+        case IR_UNDEFINED:
+        {
+            fprintf(output, "ERROR: Op not created/found (likely missing terminator).");
+        }
+        
     }
     fprintf(output, "\n");
 }
@@ -565,15 +869,19 @@ bool dump_mir(IRBuilder* builder, FILE* output) {
         fprintf(output, "function_%zu:\n", f->id.id);
 
         for (int j = 0; j < f->blocks.count; j++) {
-            fprintf(output, "  ");
+            fprintf(output, "\n  ");
             IRBlock* b = get_nth_block(f, j);
-            fprintf(output, "block_%zu:\n", b->id.id);
+            print_block_label(output, f->id, b->id);
+            fprintf(output, ":\n");
 
             for (int k = 0; k < b->instructions.count; k++) {
                 fprintf(output, "    ");
                 IRInstruct* instruction = get_nth_instruction(b, k);
-                print_instruction(builder, instruction, output);
+                print_instruction(builder, instruction, output, f->id);
             }
+            // Print terminator
+            fprintf(output, "    ");
+            print_instruction(builder, &b->term, output, f->id);
         }
     }
     fprintf(output, "\n");
