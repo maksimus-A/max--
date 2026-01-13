@@ -47,7 +47,7 @@ static inline int is_ml_comment(char* buf, int i) {
 }
 
 
-
+// Gets keyword if it exists. Otherwise, default to 'identifier'.
 static enum TokenKind get_keyword(char* buf, int i, int length) {
     enum TokenKind token_kind = IDENTIFIER;
     char *p = buf + i;
@@ -63,6 +63,7 @@ static enum TokenKind get_keyword(char* buf, int i, int length) {
 
         case 4:
             if (memcmp(p, "void", 4) == 0) token_kind = VOID;
+            if (memcmp(p, "else", 4) == 0) token_kind = ELSE;
             break;
         
         case 5:

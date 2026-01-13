@@ -5,6 +5,7 @@ static const char* token_kind_str[TOK_COUNT+1] = {
     /* TOK_EOF */          "EOF",
 
     /* IF */               "IF",
+    /* ELSE */             "ELSE",
     /* WHILE */            "WHILE",
     /* FN */               "FN",
     /* RETURN */           "RETURN",

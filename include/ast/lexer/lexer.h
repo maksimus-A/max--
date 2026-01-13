@@ -13,6 +13,7 @@ enum TokenKind {
 
     // ---- Keywords ----
     IF,
+    ELSE,
     WHILE,
     FN,
     RETURN,
