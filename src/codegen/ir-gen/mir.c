@@ -446,7 +446,6 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
 
             // Create then, else, join blocks
 
-
             BlockId then_block_id = block_init(builder);
             size_t then_idx = then_block_id.id;
 
@@ -467,8 +466,9 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
 
             // Emit branch op in current block.
             emit_branch_if_zero(builder, node, cond_val, then_block_id, nonzero_block_id);
-
-            // TODO: Build preds/succs list after this construction is done.
+            // Current block's successors.
+            VEC_PUSH_T(&get_curr_block(builder, f)->succs, then_block_id);
+            VEC_PUSH_T(&get_curr_block(builder, f)->succs, nonzero_block_id);
 
             // Now we must process statements per-new block that exists.
 
@@ -479,6 +479,8 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
             if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
                 emit_jump(builder, node, join_block_id);
             }
+            // Then block successor.
+            VEC_PUSH_T(&get_curr_block(builder, f)->succs, join_block_id);
 
             // Else block termination
             if (else_node != NULL) {
@@ -488,6 +490,8 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
                     // If no terminator, insert a jump to 'join'.
                     emit_jump(builder, node, join_block_id);
                 }
+                // Else block successor.
+                VEC_PUSH_T(&get_curr_block(builder, f)->succs, join_block_id);
             }
 
             // My understanding is if I set the curr_block to join_block,
@@ -627,7 +631,8 @@ void mir_gen_post(void* user, ASTNode* node) {
 
         default: break;
     }
-    print_value_stack(stdout, builder, node);
+    // useful debug
+    //print_value_stack(stdout, builder, node);
 }
 
 Visitor mir_gen_visitor = {

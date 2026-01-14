@@ -1,6 +1,8 @@
 #include "errors/diagnostics.h"
+#include "codegen/ir-gen/mir.h"
 #include <assert.h>
 #include <stdalign.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -86,7 +88,7 @@ void create_and_add_diag_fmt(Diagnostics* diags, Severity sev, SrcSpan span, con
 
 bool print_errors(Diagnostics* diags, const char* pass) {
     if (diags->count == 0) return false;
-    
+
     fprintf(stderr, "%s", pass);
     for (int i = 0; i < diags->count; i++) {
         char* severity = diags->items[i]->severity == ERROR ? "ERROR:" : "WARN";
@@ -96,3 +98,36 @@ bool print_errors(Diagnostics* diags, const char* pass) {
     return true;
 }
 
+// MIR STUFF
+
+// Adds instruction diagnostic during MIR verification pass
+void add_diag_mir_inst(Diagnostics* diags, Severity sev, size_t inst_num, IRInstructType inst_type, char* err_msg) {
+    char* new_err_msg = alloc_error(diags);
+    if (!new_err_msg) return;
+    snprintf(new_err_msg, DEFAULT_ERR_MSG_SIZE, "(MIR)Error at instruction number %zu: %d: %s", inst_num, inst_type, err_msg);
+
+    // I kinda cheat by writing line/col 0/0 since this was made for pre-MIR lol.
+    Diagnostic* diag = create_diag(diags->arena, sev, (SrcSpan){0, 0}, new_err_msg);
+    if (!diag) return;
+
+    push_error(diags, diag);
+}
+
+// Adds generic diagnostic during MIR verification pass
+// TODO: Understand how this works?? the ...
+__attribute__((format(printf, 3, 4))) // ??
+void add_diag_mir(Diagnostics* diags, Severity sev, const char* fmt, ...)
+{
+    char* msg = alloc_error(diags);
+    if (!msg) return;
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(msg, DEFAULT_ERR_MSG_SIZE, fmt, args);
+    va_end(args);
+
+    Diagnostic* diag = create_diag(diags->arena, sev, (SrcSpan){0,0}, msg);
+    if (!diag) return;
+
+    push_error(diags, diag);
+}

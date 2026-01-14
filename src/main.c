@@ -193,6 +193,7 @@ int main(int argc, char **argv) {
 
     if (print_errors(&diags, "RESOLVER:\n")) return 4;
 
+    // todo: probably remove in favor of CFG-based DA :((
     DefAssn defassn;
     definite_assignment_init(&defassn, &diags, &arena, &source_file, args.debug, resolver.curr_id);
     run_definite_assignment(ast_root, &defassn);
@@ -223,7 +224,10 @@ int main(int argc, char **argv) {
 
     run_ir_verifier(&verifier, &builder.funcs);
 
-    if (args.debug) fprintf(stdout, "\nIR Verifier: Instructions visited: %zu\n", verifier.inst_visited);
+    if (args.debug) {
+        if (print_errors(&ir_diags, "IR VERIFICATION:\n")) return 6;
+        fprintf(stdout, "\nIR Verifier: IR Verified!\nInstructions visited: %zu\n\n", verifier.inst_visited);
+    }
 
     // Transfers all backend work to C++.
     run_backend_pipeline(&builder.funcs, &mod, &arena, &ir_diags, &source_file, args.debug);

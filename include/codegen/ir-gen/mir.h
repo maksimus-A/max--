@@ -1,27 +1,11 @@
 // mir = max-- intermediate representation
 #pragma once
 #include "ast/parser/ast.h"
-#include "errors/diagnostics.h"
 #include "semantics/scope.h"
 #include "table/ptrtable.h"
+#include "codegen/ir-gen/ir_types.h"
 #include <stdint.h>
 
-// todo: add terminators to each block.
-// they can be 'return', 'br', 'brc', etc
-
-typedef enum IRInstructType {
-    IR_STORE,
-    IR_LOAD,
-    IR_BINOP,
-    IR_CMPOP, // comparison operation
-    // Terminators.
-    IR_JUMP, // unconditional branch/jump
-    IR_BRANCH_IF_ZERO,
-    // todo: move this to IRTerminator list.
-    IR_HALT, // terminates program with status code. (currently return 0;)
-    // no instructions allowed after exit.
-    IR_UNDEFINED
-} IRInstructType;
 
 // TODO: UNUSED
 typedef enum IRTerminator {

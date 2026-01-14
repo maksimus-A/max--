@@ -15,13 +15,13 @@ void ir_walk_func_linear(IRVisitor* visitor, void* user, Vector* funcs) {
         for (size_t j = 0; j < f->blocks.count; j++) {
             IRBlock* b = get_nth_block(f, j);
 
-            visitor->visit_block_begin(user, b);
+            visitor->visit_block_begin(user, b, f);
             for (size_t k = 0; k < b->instructions.count; k++) {
                 IRInstruct* instruction = get_nth_instruction(b, k);
 
-                visitor->visit_instruct(user, instruction, b->id, f->id, k);
+                visitor->visit_instruct(user, instruction, f, b, k);
             }
-            visitor->visit_block_end(user, b);
+            visitor->visit_block_end(user, b, f);
         }
         visitor->visit_func_end(user, f);
     }
