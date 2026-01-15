@@ -49,8 +49,8 @@ struct LIRConst {
     int64_t src;
 };
 
-// TODO: Refactor to 'return' once functions exist.
-struct LIRRet { // comes from exit(0), placeholder for 'return;'
+// MIR Halt == LIR Ret
+struct LIRRet {
     explicit LIRRet(VRegId code_)
         : id(code_) {}
     Reg id;
@@ -69,8 +69,41 @@ struct LIRBinOp {
     Operand rhs;
 };
 
+// This should just perform subtraction on the two operands.
+// Theoretically sets flags CZNV or something.
+// But for now i'll just perma materialize into a temp.
+struct LIRCmp {
+    explicit LIRCmp(VRegId dst_, Operand lhs_, Operand rhs_)
+        : dst(dst_), lhs(lhs_), rhs(rhs_) {}
+
+    Reg dst;
+    Operand lhs;
+    Operand rhs;
+};
+
+// Sets 'dst' to 0/1 depending on if cmpkind is T/F.
+struct LIRCSet {
+    explicit LIRCSet(VRegId dst_, CmpKind kind_)
+        : dst(dst_), cmp_kind(kind_) {}
+    Reg dst;
+    CmpKind cmp_kind;
+};
+
+// Compare, and Branch if Non-Zero
+struct LIRCBNZ {
+    explicit LIRCBNZ(VRegId vreg, BlockId branch_to_)
+        : bool_reg(vreg), branch_to(branch_to_) {}
+    Reg bool_reg;
+    BlockId branch_to;
+};
+
+struct LIRBranch {
+    BlockId branch_to;
+};
+
 using LIRPayload = std::variant<LIRStore, LIRLoad, LIRRet, 
-                            LIRConst, LIRBinOp>;
+                            LIRConst, LIRBinOp, LIRCmp, LIRCSet, 
+                            LIRBranch, LIRCBNZ>;
 
 
 struct LIRInstruct {
@@ -93,7 +126,6 @@ struct LIRBlock {
 
     // For regalloc
     // TODO*: actually build these in CFGGen pass!
-    // currently only ret terminator exists so there's nothing to do.
     std::vector<BlockId> preds;
     std::vector<BlockId> succs;
 

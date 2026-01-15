@@ -20,12 +20,12 @@ public:
         
     }
 
-    // Construct succs/preds.
+    // Construct preds, succs exist from MIR.
     void visit_terminator(const std::optional<LIRTerm>& term) override {
         if (term.has_value()) {
-            std::visit([&](auto& payload) {
-                visit(payload);
-            }, term->pl);
+            // std::visit([&](auto& payload) {
+            //     visit(payload);
+            // }, term->pl);
         }
         // todo: add diag that term doesn't exist? it should tho.
     }

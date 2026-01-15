@@ -17,6 +17,8 @@ void walk_mir_linear(BackendContext& ctx, MIRVisitor& v) {
             for (auto& inst : ctx.mir_insts(block)) {
                 v.visit_inst(inst);
             }
+            // Visit terminator.
+            v.visit_inst(block.term);
 
             v.post_block(block);
         }

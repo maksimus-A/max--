@@ -1,6 +1,9 @@
+#include "codegen/backend/reg_ids.hpp"
 #include "codegen/backend/visitors/mir_visitor.hpp"
 #include "codegen/backend/lir/lir.hpp"
 #include "codegen/backend/lir/lir_print.hpp"
+#include "codegen/ir-gen/ir_types.h"
+#include "errors/diagnostics.h"
 #include <algorithm>
 #include <iostream>
 #include <ostream>
@@ -52,6 +55,16 @@ public:
             case IR_STORE: create_store(inst); break;
             case IR_HALT: create_ret(inst); break;
             case IR_BINOP: create_binop(inst); break;
+            case IR_CMPOP: create_cmp(inst); create_cset(inst); break;
+            case IR_JUMP: {
+                Jump jump = inst.payload.jump_pl;
+                create_branch(jump.jump_to); break;
+            }
+            case IR_BRANCH_IF_ZERO: {
+                Branch br = inst.payload.br_pl;
+                create_cbnz(inst); 
+                create_branch(br.non_zero); break;
+            }
             default: out << "WARN: MIR -> LIR conversion for op not implemented."; break;
         }
     }
@@ -160,8 +173,8 @@ private:
                 binop.rhs.value_id.imm = abs(binop.rhs.value_id.imm);
             }
         }
-        Operand lhs = lower_add_operand(binop.lhs);
-        Operand rhs = lower_add_operand(binop.rhs);
+        Operand lhs = lower_alu_operand(binop.lhs);
+        Operand rhs = lower_alu_operand(binop.rhs);
         BinOpKind binop_kind = binop.kind;
         LIRBinOp lir_binop = LIRBinOp(binop_kind, VRegId{binop.dst.id}, lhs, rhs);
         insert_instruction(lir_binop);
@@ -197,14 +210,48 @@ private:
         }
     }
 
+    void create_cmp(const IRInstruct& inst) {
+        Cmp cmp = inst.payload.cmp_pl;
+        // TODO** Working on this. I need to understand how ARM handles comparisons/branches.
+        LIRCmp lir_cmp = LIRCmp(VRegId{cmp.dst.id}, lower_alu_operand(cmp.lhs), lower_alu_operand(cmp.rhs));
+        insert_instruction(lir_cmp);
+    }
+
+    // Currently called immediately after create_cmp, uses same inst.
+    void create_cset(const IRInstruct& inst) {
+        Cmp cmp = inst.payload.cmp_pl;
+        LIRCSet lir_cset = LIRCSet(VRegId{cmp.dst.id}, cmp.kind);
+        insert_instruction(lir_cset);
+    }
+
+    // Currently always generates 'CBNZ & B' concurrently.
+    void create_cbnz(const IRInstruct& inst) {
+        Branch br = inst.payload.br_pl;
+        VRegId vreg;
+        if (br.cmp.value_kind == IRVAL_IMM) {
+            vreg = create_const(br.cmp.value_id.imm);
+        }
+        else if (br.cmp.value_kind == IRVAL_TEMP) {
+            vreg = VRegId{br.cmp.value_id.temp_id.id};
+        }
+        LIRCBNZ cbnz = LIRCBNZ(vreg, br.non_zero);
+        insert_instruction(cbnz);
+    }
+
+    void create_branch(const BlockId& bid) {
+
+        LIRBranch lir_br{bid};
+        insert_terminator(lir_br);
+    }
+
     // Binary operator helpers
 
     // Checks if the immediate would fit inside of the add/sub
     // operation in ARM.
     bool fits_add_imm(int64_t imm) {
         int64_t a = abs(imm);
-        return (a <= 4095) ||
-            ((a & 0xfff) == 0 && (a >> 12) <= 4095);
+        return (a <= 4095); // || // TODO: add back shifted case; add shift op.
+            //((a & 0xfff) == 0 && (a >> 12) <= 4095);
     }
 
     // Changes add-> sub or sub-> add.
@@ -219,7 +266,8 @@ private:
 
     // todo: could unify these later.
     // Checks if 'imm' fits, if not emit const op
-    Operand lower_add_operand(const IRValue& val) {
+    // Currently for add/sub/cmp ops.
+    Operand lower_alu_operand(const IRValue& val) {
         if (val.value_kind == IRVAL_TEMP) {
             return Operand{VRegId{val.value_id.temp_id.id}};
         }
@@ -244,7 +292,7 @@ private:
         }
         assert(false);
     }
-
+    
     // Compare passed in slot ID to current found max ID. Tells us how 
     // many slots exist in this function.
     void compare_slot_id_to_max(SlotId slot_id) {
