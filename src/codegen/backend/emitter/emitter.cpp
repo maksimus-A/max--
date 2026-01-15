@@ -79,7 +79,8 @@ public:
                 emit(", ");
                 emit_op(binop.rhs);
                 emit("\n");
-            }
+            },
+            [&](const auto&) {/* TODO: Implement rest of ops!*/}
         }, i.pl);
     }
 

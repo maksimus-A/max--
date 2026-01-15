@@ -1,6 +1,15 @@
 // Printing LIR!
 #include "codegen/backend/lir/lir.hpp"
+#include "codegen/ir-gen/mir.h"
 #include "common.hpp"
+
+static std::string block_label(const BlockId& bid, const FuncId& fid) {
+    return "block_" + std::to_string(fid.id) + std::to_string(bid.id);
+}
+
+static std::string func_label(const FuncId& fid) {
+    return "function_" + std::to_string(fid.id);
+}
 
 static void print_reg(const Reg& r, std::ostream& out) {
     if (alt<VRegId>(r.id)) out << "v" << get<VRegId>(r.id).id;
@@ -40,7 +49,17 @@ static void print_bin_op(const LIRBinOp& binop, std::ostream& out) {
     }
 }
 
-static void print_instruction(const LIRInstruct& inst, std::ostream& out_) {
+static void print_cmp(const CmpKind& kind, std::ostream& out) {
+    switch (kind) {
+        case CMP_EQ: out << "EQ"; break;
+        case CMP_NEQ: out << "NEQ"; break;
+        case CMP_GT: out << "GT"; break;
+        case CMP_LT: out << "LT"; break;
+        case CMP_ERR: out << "CMP_ERR"; break; 
+    }
+}
+
+static void print_instruction(const LIRInstruct& inst, const BlockId& bid, const FuncId& fid, std::ostream& out_) {
     if (alt<LIRStore>(inst.pl)) {
         LIRStore store = std::get<LIRStore>(inst.pl);
         out_ << "store slot(" << store.dst.id << "), ";
@@ -62,28 +81,73 @@ static void print_instruction(const LIRInstruct& inst, std::ostream& out_) {
     if (alt<LIRBinOp>(inst.pl)) {
         print_bin_op(std::get<LIRBinOp>(inst.pl), out_);
     }
-}
-
-static void print_term(const std::optional<LIRTerm>& term, std::ostream& out) {
-    if (std::holds_alternative<LIRRet>(term->pl)) {
-        LIRRet ret = std::get<LIRRet>(term->pl);
-        out << term->inst_num << ": ret ";
-        print_reg(ret.id, out);
-        out << std::endl;
+    if (alt<LIRSetCC>(inst.pl)) {
+        LIRSetCC setcc = get<LIRSetCC>(inst.pl);
+        out_ << "setcc ";
+        print_reg(setcc.dst, out_);
+        out_ << ", ";
+        print_cmp(setcc.kind, out_);
+        out_ << ", ";
+        
+        if (alt<int64_t>(setcc.lhs)) {
+            int64_t lhs = std::get<int64_t>(setcc.lhs);
+            out_ << "#" << lhs << ", ";
+        }
+        if (alt<Reg>(setcc.lhs)) {
+            Reg lhs = std::get<Reg>(setcc.lhs);
+            print_reg(lhs, out_);
+            out_ << ", ";
+        }
+        if (alt<int64_t>(setcc.rhs)) {
+            int64_t rhs = std::get<int64_t>(setcc.rhs);
+            out_ << "#" << rhs << std::endl;
+        }
+        if (alt<Reg>(setcc.rhs)) {
+            Reg rhs = std::get<Reg>(setcc.rhs);
+            print_reg(rhs, out_);
+            out_ << std::endl;
+        }
     }
 }
 
+static void print_term(const std::optional<LIRTerm>& term, const BlockId& bid, const FuncId& fid, std::ostream& out) {
+    if (std::holds_alternative<LIRRet>(term->pl)) {
+        LIRRet ret = std::get<LIRRet>(term->pl);
+        out << "ret ";
+        print_reg(ret.id, out);
+    }
+    if (alt<LIRBranch>(term->pl)) {
+        const LIRBranch br = get<LIRBranch>(term->pl);
+        out << "branch ";
+        print_reg(br.cmp, out);
+        out << ", " << block_label(br.non_zero, fid) << ", " << block_label(br.zero, fid);
+    }
+    if (alt<LIRJump>(term->pl)) {
+        const LIRJump jump = get<LIRJump>(term->pl);
+        out << "jump " << block_label(jump.jump_to, fid);
+    }
+    out << std::endl;
+}
+
+
+
 void print_lir(const std::vector<LIRFunction>& lir_funcs_, std::ostream& out_) {
     for (auto& f: lir_funcs_) {
-        out_ << "function_" << f.id.id << ":\n";
+        out_ << "\nLIR GENERATION: " << "\n";
+        out_ << func_label(f.id) << ":\n";
         for (auto& b: f.blocks) {
-            out_ << "  block_" << b.id.id << ":\n";
+            if (b.id.id != 0)
+                out_ <<  block_label(b.id, f.id) << ":\n";
+
             for (auto& inst: b.insts) {
-                out_ << "    " << inst.inst_num << ": ";
-                print_instruction(inst, out_);
+                out_ << inst.inst_num << ": " << "    " ;
+                print_instruction(inst, b.id, f.id, out_);
             }
+            out_ << b.term->inst_num << ": ";
             out_ << "    ";
-            print_term(b.term, out_);
+            print_term(b.term, b.id, f.id, out_);
+
+            out_ << "\n";
         }
     }
 }

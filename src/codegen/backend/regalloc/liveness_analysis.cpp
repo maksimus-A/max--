@@ -72,6 +72,9 @@ public:
     void visit(const LIRRet& ret) override {
         note_use(get_vreg(ret.id));
     }
+    void visit(const LIRSetCC& setcc) {}
+    void visit(const LIRBranch& br) {}
+    void visit(const LIRJump& jump) {}
 
     /*----- IN/OUT PHASE: ------*/
     /*

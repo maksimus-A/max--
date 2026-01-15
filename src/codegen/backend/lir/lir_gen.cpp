@@ -43,6 +43,12 @@ public:
     void pre_block(const IRBlock& b) override {
         curr_func->blocks.emplace_back(b.id);
         curr_block = &curr_func->blocks.back();
+
+        // Construct successors
+        VecView<BlockId> succs = VecView<BlockId>(&b.succs);
+        for (auto& s: succs) {
+            curr_block->succs.emplace_back(s);
+        }
     }
 
     void post_block(const IRBlock& b) override {
@@ -55,16 +61,9 @@ public:
             case IR_STORE: create_store(inst); break;
             case IR_HALT: create_ret(inst); break;
             case IR_BINOP: create_binop(inst); break;
-            case IR_CMPOP: create_cmp(inst); create_cset(inst); break;
-            case IR_JUMP: {
-                Jump jump = inst.payload.jump_pl;
-                create_branch(jump.jump_to); break;
-            }
-            case IR_BRANCH_IF_ZERO: {
-                Branch br = inst.payload.br_pl;
-                create_cbnz(inst); 
-                create_branch(br.non_zero); break;
-            }
+            case IR_CMPOP: create_setcc(inst); break;
+            case IR_JUMP: create_jump(inst); break;
+            case IR_BRANCH_IF_ZERO: create_branch(inst); break;
             default: out << "WARN: MIR -> LIR conversion for op not implemented."; break;
         }
     }
@@ -141,20 +140,6 @@ private:
         insert_instruction(lir_store);
     }
 
-
-    void create_ret(const IRInstruct& inst) {
-        const Halt& halt = inst.payload.halt_payload;
-
-        LIRRet lir_ret = 
-            (halt.code.value_kind == IRVAL_TEMP)
-                ? LIRRet(VRegId{halt.code.value_id.temp_id.id})
-                : [&] {
-                    VRegId vreg = create_const(halt.code.value_id.imm);
-                    return LIRRet(vreg);
-                }();
-        insert_terminator(lir_ret);
-    }
-
     // Binary operators
 
     // Lowers LHS/RHS, then creates add operation.
@@ -210,22 +195,18 @@ private:
         }
     }
 
-    void create_cmp(const IRInstruct& inst) {
+    void create_setcc(const IRInstruct& inst) {
         Cmp cmp = inst.payload.cmp_pl;
         // TODO** Working on this. I need to understand how ARM handles comparisons/branches.
-        LIRCmp lir_cmp = LIRCmp(VRegId{cmp.dst.id}, lower_alu_operand(cmp.lhs), lower_alu_operand(cmp.rhs));
-        insert_instruction(lir_cmp);
+        // Opted to just lower it during emission or something IDK.
+        LIRSetCC lir_setcc = LIRSetCC(VRegId{cmp.dst.id}, cmp.kind, 
+            lower_alu_operand(cmp.lhs), lower_alu_operand(cmp.rhs));
+        insert_instruction(lir_setcc);
     }
 
-    // Currently called immediately after create_cmp, uses same inst.
-    void create_cset(const IRInstruct& inst) {
-        Cmp cmp = inst.payload.cmp_pl;
-        LIRCSet lir_cset = LIRCSet(VRegId{cmp.dst.id}, cmp.kind);
-        insert_instruction(lir_cset);
-    }
+    // Terminators
 
-    // Currently always generates 'CBNZ & B' concurrently.
-    void create_cbnz(const IRInstruct& inst) {
+    void create_branch(const IRInstruct& inst) {
         Branch br = inst.payload.br_pl;
         VRegId vreg;
         if (br.cmp.value_kind == IRVAL_IMM) {
@@ -234,14 +215,26 @@ private:
         else if (br.cmp.value_kind == IRVAL_TEMP) {
             vreg = VRegId{br.cmp.value_id.temp_id.id};
         }
-        LIRCBNZ cbnz = LIRCBNZ(vreg, br.non_zero);
-        insert_instruction(cbnz);
+        LIRBranch lir_br{vreg, br.non_zero, br.zero};
+        insert_terminator(lir_br);
     }
 
-    void create_branch(const BlockId& bid) {
+    void create_jump(const IRInstruct& inst) {
+        Jump jump = inst.payload.jump_pl;
+        insert_terminator(LIRJump{jump.jump_to});
+    }
 
-        LIRBranch lir_br{bid};
-        insert_terminator(lir_br);
+    void create_ret(const IRInstruct& inst) {
+        const Halt& halt = inst.payload.halt_payload;
+
+        LIRRet lir_ret = 
+            (halt.code.value_kind == IRVAL_TEMP)
+                ? LIRRet(VRegId{halt.code.value_id.temp_id.id})
+                : [&] {
+                    VRegId vreg = create_const(halt.code.value_id.imm);
+                    return LIRRet(vreg);
+                }();
+        insert_terminator(lir_ret);
     }
 
     // Binary operator helpers

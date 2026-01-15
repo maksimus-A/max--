@@ -72,38 +72,32 @@ struct LIRBinOp {
 // This should just perform subtraction on the two operands.
 // Theoretically sets flags CZNV or something.
 // But for now i'll just perma materialize into a temp.
-struct LIRCmp {
-    explicit LIRCmp(VRegId dst_, Operand lhs_, Operand rhs_)
-        : dst(dst_), lhs(lhs_), rhs(rhs_) {}
+// Stands for 'Set Condition Code'
+struct LIRSetCC {
+    explicit LIRSetCC(VRegId dst_, CmpKind kind_, Operand lhs_, Operand rhs_)
+        : dst(dst_), kind(kind_), lhs(lhs_), rhs(rhs_) {}
 
     Reg dst;
+    CmpKind kind;
     Operand lhs;
     Operand rhs;
 };
 
-// Sets 'dst' to 0/1 depending on if cmpkind is T/F.
-struct LIRCSet {
-    explicit LIRCSet(VRegId dst_, CmpKind kind_)
-        : dst(dst_), cmp_kind(kind_) {}
-    Reg dst;
-    CmpKind cmp_kind;
-};
-
-// Compare, and Branch if Non-Zero
-struct LIRCBNZ {
-    explicit LIRCBNZ(VRegId vreg, BlockId branch_to_)
-        : bool_reg(vreg), branch_to(branch_to_) {}
-    Reg bool_reg;
-    BlockId branch_to;
-};
-
 struct LIRBranch {
-    BlockId branch_to;
+    explicit LIRBranch(VRegId cmp_, BlockId non_zero_, BlockId zero_)
+        : cmp(cmp_), non_zero(non_zero_), zero(zero_) {}
+    Reg cmp;
+    BlockId non_zero;
+    BlockId zero;
+};
+
+struct LIRJump {
+    BlockId jump_to;
 };
 
 using LIRPayload = std::variant<LIRStore, LIRLoad, LIRRet, 
-                            LIRConst, LIRBinOp, LIRCmp, LIRCSet, 
-                            LIRBranch, LIRCBNZ>;
+                            LIRConst, LIRBinOp, LIRSetCC,
+                            LIRBranch, LIRJump>;
 
 
 struct LIRInstruct {
