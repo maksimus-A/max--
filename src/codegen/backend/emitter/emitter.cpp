@@ -61,18 +61,9 @@ public:
             },
             [&](const LIRRet& ret) {
                 emit_line("\tmov ", RET, ", ", reg(ret.id));
-                emit_line("b ", func_ret_label(fid));
+                emit_line("\tb ", func_ret_label(fid));
             },
             [&](const LIRBinOp& binop) {
-                auto emit_op = [&](const auto& op) {
-                    if (alt<Reg>(op)) {
-                        emit(reg(get<Reg>(op)));
-                    } else if (alt<int64_t>(op)) {
-                        emit(get<int64_t>(op));  // relies on ostream << int64_t
-                    } else {
-                        // unreachable / diagnostic
-                    }
-                };
 
                 emit("\t", binop_name(binop.bin_op_kind), " ", reg(binop.dst), ", ");
                 emit_op(binop.lhs);
@@ -80,13 +71,57 @@ public:
                 emit_op(binop.rhs);
                 emit("\n");
             },
+            [&](const LIRSetCC& setcc) {
+                /*TODO: Sooooo this is fundamentally flawed.
+                It always materializes bools into regs instead of using the ARM
+                flags. This isn't inherently wrong but it's very inefficient.
+                One day I might peephole the LIR to use that op instead.
+                Or just directly do it during emission IDK. */
+
+                // First emit CMP op
+                emit("\tcmp ");
+                emit_op(setcc.lhs);
+                emit(", ");
+                emit_op(setcc.rhs);
+                emit("\n");
+
+                // Now emit 'CSET op'
+                // TODO**: This has a flaw. It assumes all comparisons are signed.
+                // they are, but they might not be later. Later, assign a 'signed'
+                // bool to the instruction for proper emission.
+                emit_line("\tcset ", reg(setcc.dst), ", " , cmp_name(setcc.kind));
+            },
+            [&](const LIRBranch& br) {
+                // Emit 'CBNZ' (Conditional branch if not zero?)
+                emit_line("\tcbnz ", reg(br.cmp), ", ", block_label(fid, br.non_zero));
+                // Emit unconditional branch to 'zero' target
+                emit_line("\tb ", block_label(fid, br.zero));
+            },
+            [&](const LIRJump& j) {
+                emit_line("\tb ", block_label(fid, j.jump_to));
+            },
             [&](const auto&) {/* TODO: Implement rest of ops!*/}
         }, i.pl);
     }
 
+    void emit_op(const Operand& op) {
+        if (alt<Reg>(op)) {
+            emit(reg(get<Reg>(op)));
+        } else if (alt<int64_t>(op)) {
+            emit(get<int64_t>(op));  // relies on ostream << int64_t
+        } else {
+            // unreachable / diagnostic
+        }
+    }
+
     // FuncId's are unique per program.
     void emit_function_label(const FuncId& fid) {
+        // todo: later when real funcs exist emit the real name.
         emit_line("function_", fid.id, ":");
+    }
+
+    std::string function_label(const FuncId& fid) {
+        return "function_" +std::to_string(fid.id);
     }
 
     // Needed for archARM to run properly.
@@ -96,7 +131,12 @@ public:
 
     // Each functionid/blockid pair is unique.
     void emit_block_label(const FuncId& fid, const BlockId& bid) {
-        emit_line("block_", fid.id, bid.id, ":");
+        // Local Basic Bloc {FuncId}_{BlockId}
+        emit_line(".LBB", fid.id, "_", bid.id, ":");
+    }
+
+    std::string block_label(const FuncId& fid, const BlockId& bid) {
+        return ".LBB" +std::to_string(fid.id) + "_" + std::to_string(bid.id);
     }
 
     // Prologue/epilogue emission
@@ -181,6 +221,16 @@ private:
             {
                 return "ERR_NO_OP";
             }
+        }
+    }
+
+    const char* cmp_name(const CmpKind& kind) {
+        switch (kind) {
+            case CMP_EQ: return "EQ";
+            case CMP_NEQ: return "NE";
+            case CMP_GT: return "GT";
+            case CMP_LT: return "LT";
+            case CMP_ERR: return "CMP_ERR"; 
         }
     }
     const char* FP = arch_reg_name(ArchReg::X29);

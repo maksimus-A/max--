@@ -282,13 +282,15 @@ int expect_semicolon_or_recover(Parser* parser) {
 }
 
 // Expect specific token. If found, advance cursor. Else, append error message to diagnostics.
-void expect_token(Parser* parser, enum TokenKind kind) {
+bool expect_token(Parser* parser, enum TokenKind kind) {
     char* err_msg = alloc_error(parser->diags);
     if (!expect(parser, kind, err_msg)) {
         add_diag(parser->diags, ERROR, create_span_curr_token(parser), 
                 err_msg, current(parser).line, current(parser).col);
         sync_to_boundary(parser);
+        return false;
     }
+    return true;
 }
 
 
@@ -629,6 +631,37 @@ ASTNode* parse_if_stmt(Parser* parser, Source* source_file) {
     return if_node;
 }
 
+// Assumes we start at 'WHILE' token.
+ASTNode* parse_while_stmt(Parser* parser, Source* source_file) {
+
+    size_t while_start = current(parser).start;
+    advance(parser);
+    if (!expect_token(parser, PAREN_START)) return NULL;
+
+    ASTNode* cond = parse_expr(parser, source_file, 0);
+
+    expect_token(parser, PAREN_END);
+    expect_token(parser, CUR_BRACK_START);
+
+    // Parse block node/statements
+    ASTNode* loop_block = parse_block_node(parser, source_file);
+
+    size_t while_end = current(parser).start;
+
+    WhileStmtInfo while_stmt = (WhileStmtInfo) {
+        .cond = cond,
+        .loop_block = loop_block
+    };
+
+    ASTNode* while_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+    while_node->ast_kind = AST_WHILE;
+    while_node->id = parser->curr_id++;
+    while_node->span = create_span_from(while_start, while_end);
+    while_node->node_info.while_stmt = while_stmt;
+
+    return while_node;
+}
+
 
 
 /*------ ITEM HELPER ------ */
@@ -713,7 +746,7 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
                     break;
             }
         }
-        else if (starts_stmt(parser)) {  // Currently supports: assignments, returns.
+        else if (starts_stmt(parser)) {  // Currently supports: assignments, returns, if, while.
             switch (current(parser).token_kind) {
                 case IDENTIFIER:
                 {
@@ -738,6 +771,12 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
                 {
                     ASTNode* if_stmt = parse_if_stmt(parser, source_file);
                     push_node(parser, list, if_stmt);
+                    break;
+                }
+                case WHILE:
+                {
+                    ASTNode* while_stmt = parse_while_stmt(parser, source_file);
+                    push_node(parser, list, while_stmt);
                     break;
                 }
 

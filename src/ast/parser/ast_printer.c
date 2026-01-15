@@ -149,6 +149,17 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             printf(")\n");
             break;
         }
+        case AST_WHILE:
+        {
+            printf("WhileStmt id={%d}\n", (int)node->id);
+            indent++;
+            dump_ast(node->node_info.while_stmt.cond, source_file, indent);
+            dump_ast(node->node_info.while_stmt.loop_block, source_file, indent);
+            indent--;
+            print_indentation(indent);
+            printf(")\n");
+            break;
+        }
         case AST_EXIT:
         {
             printf("Exit id={%d}\n", (int)node->id);

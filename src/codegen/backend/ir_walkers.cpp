@@ -42,7 +42,7 @@ void walk_lir_linear(BackendContext& ctx, LIRVisitor& v) {
             }
             v.visit_terminator(block.term);
             insts_visited++;
-            std::cout << "LIR Walker: Instructions Visited: " << insts_visited << std::endl;
+            //std::cout << "LIR Walker: Instructions Visited: " << insts_visited << std::endl;
             v.post_block(block);
         }
         v.post_func(func);
@@ -76,7 +76,7 @@ void walk_lir_backwards_insts_linear(BackendContext& ctx, LIRVisitor& v) {
                 }
             v.visit_terminator(block.term);
             insts_visited++;
-            std::cout << "LIR Backwards Instruction Walker: Instructions Visited: " << insts_visited << std::endl;
+            //std::cout << "LIR Backwards Instruction Walker: Instructions Visited: " << insts_visited << std::endl;
             v.post_block(block);
         }
         v.post_func(func);

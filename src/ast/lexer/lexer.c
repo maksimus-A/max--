@@ -300,6 +300,7 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                 else if (is_ident_starter((unsigned char)c)) {
                     int length = get_identifier_len(source_file->buffer, i);
                     Token token;
+                    // Only grabs keyword if keyword exists, otherwise defaults to 'identifier'.
                     enum TokenKind token_kind = get_keyword(source_file->buffer, i, length);
                     // TODO: Validate identifier if token_kind is not a keyword
                     // Currently doesn't validate if no invalid keywords exist.

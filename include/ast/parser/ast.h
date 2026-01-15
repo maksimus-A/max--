@@ -20,8 +20,9 @@ typedef enum ASTKind {
     // Control flow stuff
     AST_COND,
     AST_IF,
-    AST_THEN,
-    AST_ELSE,
+    AST_WHILE,
+    AST_THEN, // todo: unused?
+    AST_ELSE, // todo: unused?
     AST_ERROR
 } ASTKind;
 
@@ -98,8 +99,12 @@ typedef struct IfStmtInfo {
     ASTNode* else_block;
 } IfStmtInfo;
 
-//Built-ins
-// Exit
+typedef struct WhileStmtInfo {
+    ASTNode* cond;
+    ASTNode* loop_block;
+} WhileStmtInfo;
+
+// Exit (turns into return now.)
 typedef struct ExitInfo {
     SrcSpan func_span;
     ASTNode* expr;
@@ -123,6 +128,7 @@ typedef struct ASTNode {
         AssnStmtInfo assn_stmt;
         BinOpInfo bin_op; // also for cmpop
         IfStmtInfo if_stmt;
+        WhileStmtInfo while_stmt;
     } node_info;
 } ASTNode;
 

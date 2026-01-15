@@ -1,0 +1,7 @@
+int x = 0;
+int i = 0;
+while (i < 5) {
+    x = x + 2;
+    i = i + 1;
+}
+return x; // expected 10
