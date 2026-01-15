@@ -180,9 +180,17 @@ public:
                 rewrite_operand_if_reg_vreg_in_map(binop.lhs, vreg_to_preg);
                 rewrite_operand_if_reg_vreg_in_map(binop.rhs, vreg_to_preg);
             },
-            [&](auto&) {
-                // do nothing
-            }
+            [&](LIRSetCC& setcc) {
+                rewrite_reg_if_vreg_in_map(setcc.dst, vreg_to_preg);
+                rewrite_operand_if_reg_vreg_in_map(setcc.lhs, vreg_to_preg);
+                rewrite_operand_if_reg_vreg_in_map(setcc.rhs, vreg_to_preg);
+            },
+            [&](LIRBranch& br) {
+                rewrite_reg_if_vreg_in_map(br.cmp, vreg_to_preg);
+            },
+            [&](LIRJump& jump) {
+                // Jumps don't use vregs.
+            },
         }, inst.pl);
     }
 
@@ -351,6 +359,7 @@ private:
             [&](const LIRLoad& load)  { maybe_push_vreg(defined, load.dst); },
             [&](const LIRConst& cons) { maybe_push_vreg(defined, cons.dst); },
             [&](const LIRBinOp& binop){ maybe_push_vreg(defined, binop.dst); },
+            [&](const LIRSetCC& setcc){ maybe_push_vreg(defined, setcc.dst); },
             [&](auto const&) { /* none */ }
         }, inst.pl);
 
@@ -372,6 +381,11 @@ private:
             [&](const LIRRet& ret) {
                 maybe_push_vreg(used, ret.id);
             },
+            [&](const LIRSetCC& setcc){ 
+                maybe_push_vreg(used, setcc.lhs);
+                maybe_push_vreg(used, setcc.rhs);
+            },
+            [&](const LIRBranch& br){ maybe_push_vreg(used, br.cmp); },
             [&](auto const&) { /* none */ }
         }, inst.pl);
 
@@ -408,7 +422,8 @@ private:
 
     // Debug printing
     void print_live_intervals() {
-        out << "Block " << curr_block->id.id << ": " << std::endl;
+        out << "Function " << curr_func->id.id << ":\n";
+        out << "After scanning Block " << curr_block->id.id << ": " << std::endl;
         for (int i = 0; i < curr_info->intervals.size(); i++) {
             const auto& interval = curr_info->intervals[i];
 
