@@ -35,6 +35,7 @@ public:
         curr_info->def[curr_block->id.id].print_bitset();
         out << "Block " << curr_block->id.id << ": USE:" << std::endl;
         curr_info->use[curr_block->id.id].print_bitset();
+        out << "\n";
     }
     
     void visit_inst(const LIRInstruct& inst) override {
@@ -72,9 +73,26 @@ public:
     void visit(const LIRRet& ret) override {
         note_use(get_vreg(ret.id));
     }
-    void visit(const LIRSetCC& setcc) {}
-    void visit(const LIRBranch& br) {}
-    void visit(const LIRJump& jump) {}
+    void visit(const LIRSetCC& setcc) {
+        note_def(get_vreg(setcc.dst));
+
+        if (std::holds_alternative<Reg>(setcc.lhs)) {
+            Reg lhs = std::get<Reg>(setcc.lhs);
+            VRegId vreg = get_vreg(lhs);
+            note_use(vreg);
+        }
+        if (std::holds_alternative<Reg>(setcc.rhs)) {
+            Reg rhs = std::get<Reg>(setcc.rhs);
+            VRegId vreg = get_vreg(rhs);
+            note_use(vreg);
+        }
+    }
+    void visit(const LIRBranch& br) {
+        note_use(get_vreg(br.cmp));
+    }
+    void visit(const LIRJump& jump) {
+        // No uses or definitions here.
+    }
 
     /*----- IN/OUT PHASE: ------*/
     /*
@@ -154,6 +172,7 @@ public:
 
         out << "Block 0" << b.id.id << ": OUT:" << std::endl;
         curr_info->out[b.id.id].print_bitset();
+        out << "\n";
     }
 
     /*------ VARIABLE LIVENESS PHASE: ------*/
