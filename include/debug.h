@@ -43,3 +43,5 @@ static const char* token_kind_str[TOK_COUNT+1] = {
 
 void print_all_tokens(TokenBuffer* tokens, const char *buffer);
 void pretty_print_tokens(TokenBuffer* tokens, const char *buffer);
+
+void print_token_kind(enum TokenKind kind);

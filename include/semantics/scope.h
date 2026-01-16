@@ -3,12 +3,28 @@
 #include "errors/diagnostics.h"
 #include "semantics/semantics.h"
 
-typedef struct Symbol { 
+typedef enum SymbolKind {
+    SYM_VAR,
+    SYM_FN
+}SymbolKind;
+
+typedef struct FnSig {
+    BuiltInType ret_type;
+    BuiltInType* param_types;
+    size_t param_count;
+    // later: bool is_extern; calling conv; etc.
+} FnSig;
+
+typedef struct Symbol {
     SrcSpan symbol_span;
-    BuiltInType type;
-    bool is_var;
+    SymbolKind kind;
     size_t id;
     struct Symbol* next;
+
+    union {
+        BuiltInType var_type;
+        FnSig fn_sig;
+    };
 } Symbol;
 
 typedef struct Scope  { 

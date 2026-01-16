@@ -176,13 +176,12 @@ int main(int argc, char **argv) {
         return 3;
     }
 
+    // TODO: Remove old parser errs, switch fully to diags. Some uses it some don't.
+    if (print_errors(&diags, "AST BUILDER:\n")) return 3;
     if (args.debug) {
         printf("------------- AST -------------\n");
         dump_ast(ast_root, &source_file, 0);
     }
-    // TODO: Remove old parser errs, switch fully to diags. Some uses it some don't.
-    if (print_errors(&diags, "AST BUILDER:\n")) return 3;
-
     /*------ Semantic passes ------*/
 
     // Scope resolver

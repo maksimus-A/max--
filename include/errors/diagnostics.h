@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define DEFAULT_ERR_MSG_SIZE 100
+#define DEFAULT_ERR_MSG_SIZE 200
 
 typedef enum Severity {
     WARN,

@@ -12,6 +12,8 @@ char* built_in_type_string[TYPE_TOTAL_COUNT] = {
 
     /*TYPE_BOOL*/        "bool",
     /*TYPE_CHAR*/        "char",
+    /*TYPE VOID*/        "void",
+    /*TYPE UNKNOWN*/     "UNKNOWN_TYPE"
 };
 
 const char* op_string[TOK_COUNT] = {
@@ -38,6 +40,13 @@ void print_indentation(int indent) {
     }
 }
 
+void print_param(ParamDeclInfo param, FILE* out, Source* source_file) {
+    fprintf(out, "(type={%s} name={", get_type_string(param.type));
+    char* param_start = start_of_name(param.name, source_file);
+    print_file_slice(param_start, param.name.length, out);
+    fprintf(out, "})");
+}
+
 /*
 (Program
   (VarDecl type=int name=x
@@ -56,6 +65,54 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
                 dump_ast(node->node_info.program.body.items[i], source_file, indent);
             }
             indent--;
+            print_indentation(indent);
+            printf(")\n");
+            break;
+        }
+        case AST_FN_DEC: 
+        {
+            const FnDeclInfo fn = node->node_info.fn_dec;
+            char* fn_start = start_of_name(fn.fn_name, source_file);
+
+            printf("FnDecl id={%d} name={", (int)node->id);
+            print_file_slice(fn_start, fn.fn_name.length, stdout);
+            printf("} ret_type={%s} ", get_type_string(fn.ret_type));
+
+            printf("params={");
+            for (int i = 0; i < fn.params.count; i++) {
+                print_param(VEC_AT_T(&fn.params, ParamDeclInfo, i), stdout, source_file);
+                printf(" ");
+            }
+            ASTNode* block = fn.fn_block;
+            if (block != NULL) {
+                printf("\n");
+                indent++;
+                dump_ast(block, source_file, indent);
+                indent--;
+                print_indentation(indent);
+            }
+            printf(")\n");
+            break;
+        }
+        case AST_FN_CALL:
+        {
+            // Print callee (ast_name)
+            CallExprInfo call = node->node_info.fn_call;
+            printf("CallExpr id={%zu} fn_name=", node->id);
+            ASTNode* callee = call.callee;
+            if (callee != NULL) {
+                printf("\n");
+                indent++;
+                dump_ast(callee, source_file, indent);
+                indent--;
+                print_indentation(indent);
+            }
+            printf("(args=\n");
+
+            int arg_indent = indent + 1;
+            for (int i = 0; i < call.args.count; i++) {
+                dump_ast(VEC_AT_T(&call.args, ASTNode*, i), source_file, arg_indent);
+            }
             print_indentation(indent);
             printf(")\n");
             break;

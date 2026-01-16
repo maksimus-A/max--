@@ -21,6 +21,9 @@ typedef enum ASTKind {
     AST_COND,
     AST_IF,
     AST_WHILE,
+    // Function stuff
+    AST_FN_DEC,
+    AST_FN_CALL,
     AST_THEN, // todo: unused?
     AST_ELSE, // todo: unused?
     AST_ERROR
@@ -35,6 +38,8 @@ typedef enum BuiltInType {
 
     TYPE_BOOL,
     TYPE_CHAR,
+    TYPE_VOID,
+    TYPE_UNKNOWN,
     TYPE_TOTAL_COUNT
     // todo: add more types as we go
 } BuiltInType;
@@ -69,7 +74,7 @@ typedef struct VarDeclInfo {
 
 // Variable name
 typedef struct VarNameInfo{
-    SrcSpan name_span; // var name
+    SrcSpan name_span; // var/function name??
     Symbol* resolved_sym;
 } VarNameInfo;
 
@@ -104,6 +109,31 @@ typedef struct WhileStmtInfo {
     ASTNode* loop_block;
 } WhileStmtInfo;
 
+// Function stuff
+
+// Not an 'AST' type, purely internal to FnDecl.
+typedef struct ParamDeclInfo {
+    SrcSpan name;
+    BuiltInType type;
+} ParamDeclInfo;
+
+typedef struct FnDeclInfo {
+    SrcSpan fn_name;
+    BuiltInType ret_type;
+    Vector params; // Vector of ParamDeclInfos.
+    ASTNode* fn_block;
+    Symbol* sym; // Assigned during scope resolution.
+} FnDeclInfo;
+
+// Used for function calls. 
+typedef struct CallExprInfo {
+    ASTNode* callee;         // AST_NAME??
+    Vector args;             // ASTNode* exprs
+    // Set only after scope_res.
+    Symbol* callee_symbol;   // resolved function symbol
+    BuiltInType ret_type;        // return type (or Unknown until resolved)
+} CallExprInfo;
+
 // Exit (turns into return now.)
 typedef struct ExitInfo {
     SrcSpan func_span;
@@ -124,11 +154,13 @@ typedef struct ASTNode {
         VarDeclInfo var_decl;
         VarNameInfo var_name;
         BlockInfo block_info;
-        ExitInfo exit_info;
+        ExitInfo exit_info; // return info really.
         AssnStmtInfo assn_stmt;
         BinOpInfo bin_op; // also for cmpop
         IfStmtInfo if_stmt;
         WhileStmtInfo while_stmt;
+        FnDeclInfo fn_dec;
+        CallExprInfo fn_call;
     } node_info;
 } ASTNode;
 

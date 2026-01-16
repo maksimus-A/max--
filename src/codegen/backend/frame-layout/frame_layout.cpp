@@ -42,7 +42,10 @@ public:
                     slot_sa = SizeAlign{8, 8};
                 }
                 else {
-                    BuiltInType sym_type = sym->type;
+                    BuiltInType sym_type;
+                    if (sym->kind == SYM_VAR) {
+                        sym_type = sym->var_type;
+                    }
 
                     // Get alignment/size of symbol (based on symbol type)
                     slot_sa = builtin_type_sizealign[sym_type];

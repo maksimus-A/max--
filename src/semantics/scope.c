@@ -90,8 +90,8 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
             // Declare var in current scope
             Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
             symbol->symbol_span = node->node_info.var_decl.name_span;
-            symbol->type = node->node_info.var_decl.type;
-            symbol->is_var = true;
+            symbol->kind = SYM_VAR;
+            symbol->var_type = node->node_info.var_decl.type;
             symbol->id = resolver->curr_id;
             resolver->curr_id++;
             add_symbol_to_table(resolver->semantics, symbol);
@@ -124,7 +124,7 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
                     "Symbol '%.*s' has not been declared.", resolver->source_file);
                 break;
             }
-            if (!name_symbol->is_var){
+            if (name_symbol->kind != SYM_VAR){
                 create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.assn_stmt.name_span, 
                     "Symbol '%.*s' is not an assignable variable.", resolver->source_file);
                 break;

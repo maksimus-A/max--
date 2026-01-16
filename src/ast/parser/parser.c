@@ -318,6 +318,18 @@ long get_int_lit_value(Parser* parser, Source* source_file) {
     return value;
 }
 
+// True if binop type is a comparison.
+bool binop_is_cmp(Token op) {
+    switch (op.token_kind) {
+        case EQQ:
+        case NEQ:
+        case LESS_THAN:
+        case GREATER_THAN:
+            return true;
+        default: return false;
+    }
+}
+
 /*--------- PARSE_{NODE} ---------*/
 
 // Parses LHS of expression.
@@ -363,15 +375,61 @@ ASTNode* parse_primary(Parser* parser, Source* source_file) {
     return expr;
 }
 
-bool binop_is_cmp(Token op) {
-    switch (op.token_kind) {
-        case EQQ:
-        case NEQ:
-        case LESS_THAN:
-        case GREATER_THAN:
-            return true;
-        default: return false;
+// Parses postfix ops of an expression (currently function calls)
+// For a function, starts at '('
+ASTNode* parse_postfix(Parser* parser, Source* source_file, ASTNode* lhs) {
+
+    while (current(parser).token_kind == PAREN_START) {
+        size_t call_start = lhs->span.start;
+        size_t call_end = 0;
+
+        CallExprInfo call_expr;
+
+        // We know it's a function call now.
+        ASTNode* call_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+
+        // Init arg vector.
+        VEC_INIT_T(&call_expr.args, parser->ast_arena, ASTNode*);
+
+        // Consume '('
+        advance(parser);
+        // Built arg list if it exists
+        if (current(parser).token_kind != PAREN_END) {
+            // Push args into call_expr
+            // Parse first argument
+            ASTNode* arg = parse_expr(parser, source_file, 0);
+            VEC_PUSH_T(&call_expr.args, arg);
+
+            // Parse any additional arguments: (, expr)*
+            while (current(parser).token_kind == COMMA) {
+                advance(parser); // consume ','
+
+                ASTNode* arg2 = parse_expr(parser, source_file, 0);
+                VEC_PUSH_T(&call_expr.args, arg2);
+            }
+
+            if (current(parser).token_kind != PAREN_END) {
+                SrcSpan span = create_span_curr_token(parser);
+                add_diag(parser->diags, ERROR, span, "Expected ')'.", current(parser).line, current(parser).col);
+                sync_to_boundary(parser);
+            }
+            else{
+                call_end = current(parser).start;
+                advance(parser);
+            }
+        }
+        // Set callee (function callee)
+        call_expr.callee = lhs;
+        // Other call_expr stuff will be resolved in future passes.
+        call_node->ast_kind = AST_FN_CALL;
+        call_node->id = parser->curr_id++;
+        call_node->span = create_span_from(call_start, call_end);
+        call_node->node_info.fn_call = call_expr;
+
+        lhs = call_node;
     }
+
+    return lhs;
 }
 
 // Pratt parses expression, moves pointer to end of expr.
@@ -382,6 +440,7 @@ ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
     ASTNode* LHS = parse_primary(parser, source_file);
     if (LHS->ast_kind == AST_ERROR) return NULL;
 
+    LHS = parse_postfix(parser, source_file, LHS);
     while (is_infix(current(parser)) && precedence(current(parser)) >= min_prec) {
         Token op = current(parser);
         int new_min_prec = precedence(op) + 1; // only for left-assoc. right should just be prec(op)
@@ -416,6 +475,8 @@ ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
         };
         parser->curr_id++;
         LHS = new_lhs;
+        // TODO: is optional. could remove? for complex function calls?
+        LHS = parse_postfix(parser, source_file, LHS);
     }
 
     return LHS;
@@ -662,6 +723,89 @@ ASTNode* parse_while_stmt(Parser* parser, Source* source_file) {
     return while_node;
 }
 
+BuiltInType get_builtin_type(Token token) {
+    switch (token.token_kind) {
+        case INT: return TYPE_INT;
+        default: return TYPE_UNKNOWN; break;
+    }
+}
+
+// Parses parameter list. Starts after (
+void parse_parameter_list(Parser* parser, Vector* params, Source* source_file) {
+    // todo :implement
+    while (current(parser).token_kind != PAREN_END) {
+        // Grab type
+        BuiltInType type = get_builtin_type(current(parser));
+        advance(parser);
+        // Grab name
+        SrcSpan name = create_span_curr_token(parser);
+        ParamDeclInfo param = (ParamDeclInfo) {
+            .name = name,
+            .type = type
+        };
+        VEC_PUSH_T(params, param);
+
+        advance(parser);
+        if (!match_kind(parser, COMMA)) {
+            if (current(parser).token_kind != PAREN_END){
+                add_diag(parser->diags, ERROR, name, "Expected ',' or ')'", current(parser).line, current(parser).col);
+                sync_to_boundary(parser);
+                break;
+            }
+        }
+    }
+
+    advance(parser);
+}
+
+// Parse function declaration. assumes we start at 'FN' token.
+ASTNode* parse_fn_decl(Parser* parser, Source* source_file) {
+
+    size_t fn_start = current(parser).start;
+    advance(parser);
+
+    SrcSpan fn_name = create_span_curr_token(parser);
+    // Init param list
+    Vector params;
+    VEC_INIT_T(&params, parser->ast_arena, ParamDeclInfo);
+
+    advance(parser); // goto paren_start
+    if (!expect_token(parser, PAREN_START)) {
+        return NULL;
+    }
+
+    // parse param list (if it exists)
+    if (next(parser).token_kind != PAREN_END) {
+        parse_parameter_list(parser, &params, source_file);
+    }
+
+    // Check if return type is given
+    BuiltInType ret_type = TYPE_VOID;
+    if (match_kind(parser, COLON)) { // if match, consume token
+        ret_type = get_builtin_type(current(parser));
+        advance(parser);
+    }
+    expect_token(parser, CUR_BRACK_START);
+
+    ASTNode* fn_block = parse_block_node(parser, source_file);
+
+    size_t fn_end = current(parser).start;
+
+    ASTNode* fn_dec_node = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+    fn_dec_node->ast_kind = AST_FN_DEC;
+    fn_dec_node->id = parser->curr_id++;
+    fn_dec_node->span = create_span_from(fn_start, fn_end);
+    fn_dec_node->node_info.fn_dec = (FnDeclInfo) {
+        .fn_name = fn_name,
+        .params = params,
+        .ret_type = ret_type,
+        .fn_block = fn_block,
+        .sym = NULL
+    };
+
+    return fn_dec_node;
+}
+
 
 
 /*------ ITEM HELPER ------ */
@@ -732,6 +876,7 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
         if (starts_decl(parser)) {
             switch (current(parser).token_kind) {
                 case INT:
+                {
                     // TODO: Just call 'parse_int_decl' and let that handle missing identifier.
                     if (next(parser).token_kind == IDENTIFIER) {
                         ASTNode* int_decl = parse_int_decl(parser, source_file);
@@ -742,6 +887,13 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
                         expect_semicolon_or_recover(parser);
                     }
                     break;
+                }
+                case FN:
+                {
+                    ASTNode* fn_decl = parse_fn_decl(parser, source_file);
+                    push_node(parser, list, fn_decl);
+                    break;
+                }
                 default:
                     break;
             }
@@ -751,13 +903,8 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
                 case IDENTIFIER:
                 {
                     if (next(parser).token_kind == EQ) {
-                        if (peek_n(parser, 2).token_kind == EQ) {
-                            // todo: later consider conditionals, '=='
-                        }
-                        else {
-                            ASTNode* assn = parse_assn(parser, source_file);
-                            push_node(parser, list, assn);
-                        }
+                        ASTNode* assn = parse_assn(parser, source_file);
+                        push_node(parser, list, assn);
                     }
                     break;
                 }

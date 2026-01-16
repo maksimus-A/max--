@@ -1,8 +1,7 @@
-int N = 200;
-int count = 0;
-int n = 2;
-while (n < (N+1)) {
-  count = count + 1;
-  n = n + 1;
+int x = 0;
+
+while (x < 5) {
+    x = x + 1;
 }
-return count;
+
+return x;

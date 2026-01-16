@@ -28,3 +28,7 @@ void pretty_print_tokens(TokenBuffer* tokens, const char *buffer) {
     }
     printf("\n");
 }
+
+void print_token_kind(enum TokenKind kind) {
+    printf("current token kind: %s\n", token_kind_str[kind]);
+}
