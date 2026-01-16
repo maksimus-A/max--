@@ -5,16 +5,19 @@
 
 typedef enum SymbolKind {
     SYM_VAR,
-    SYM_FN
+    SYM_FN,
+    SYM_PARAM
 }SymbolKind;
 
+// Function signature
 typedef struct FnSig {
+    SrcSpan name;
     BuiltInType ret_type;
-    BuiltInType* param_types;
     size_t param_count;
-    // later: bool is_extern; calling conv; etc.
+    BuiltInType* param_types; // arena owned
 } FnSig;
 
+// Either var, param, or function dec.
 typedef struct Symbol {
     SrcSpan symbol_span;
     SymbolKind kind;
@@ -22,7 +25,7 @@ typedef struct Symbol {
     struct Symbol* next;
 
     union {
-        BuiltInType var_type;
+        BuiltInType type;
         FnSig fn_sig;
     };
 } Symbol;

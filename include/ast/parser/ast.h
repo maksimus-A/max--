@@ -127,10 +127,10 @@ typedef struct FnDeclInfo {
 
 // Used for function calls. 
 typedef struct CallExprInfo {
-    ASTNode* callee;         // AST_NAME??
+    ASTNode* callee;         // AST_NAME/VarName
     Vector args;             // ASTNode* exprs
     // Set only after scope_res.
-    Symbol* callee_symbol;   // resolved function symbol
+    Symbol* callee_sym;   // resolved function symbol
     BuiltInType ret_type;        // return type (or Unknown until resolved)
 } CallExprInfo;
 

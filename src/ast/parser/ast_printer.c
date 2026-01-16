@@ -3,18 +3,7 @@
 #include "ast/lexer/lexer.h"
 #include "ast/parser/ast.h"
 #include "common.h"
-
-char* built_in_type_string[TYPE_TOTAL_COUNT] = {
-    /*TYPE_INT*/         "int", // Converts to i32
-
-    // Signed integers
-    /*TYPE_SI64*/        "i64",
-
-    /*TYPE_BOOL*/        "bool",
-    /*TYPE_CHAR*/        "char",
-    /*TYPE VOID*/        "void",
-    /*TYPE UNKNOWN*/     "UNKNOWN_TYPE"
-};
+#include "debug.h"
 
 const char* op_string[TOK_COUNT] = {
     [PLUS] = "+",
@@ -83,6 +72,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
                 print_param(VEC_AT_T(&fn.params, ParamDeclInfo, i), stdout, source_file);
                 printf(" ");
             }
+            printf("}");
             ASTNode* block = fn.fn_block;
             if (block != NULL) {
                 printf("\n");
@@ -98,7 +88,7 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         {
             // Print callee (ast_name)
             CallExprInfo call = node->node_info.fn_call;
-            printf("CallExpr id={%zu} fn_name=", node->id);
+            printf("FnCall id={%zu} fn_name=", node->id);
             ASTNode* callee = call.callee;
             if (callee != NULL) {
                 printf("\n");

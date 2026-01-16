@@ -1,5 +1,6 @@
 #pragma once
 #include "ast/lexer/lexer.h"
+#include "ast/parser/ast.h"
 
 static const char* token_kind_str[TOK_COUNT+1] = {
     /* TOK_EOF */          "EOF",
@@ -39,6 +40,19 @@ static const char* token_kind_str[TOK_COUNT+1] = {
 
     /* NO TOKEN */         "NO_TOKEN",
     /* TOKEN COUNT*/       "TOK_COUNT"
+};
+
+
+static char* built_in_type_string[TYPE_TOTAL_COUNT] = {
+    /*TYPE_INT*/         "int", // Converts to i32
+
+    // Signed integers
+    /*TYPE_SI64*/        "i64",
+
+    /*TYPE_BOOL*/        "bool",
+    /*TYPE_CHAR*/        "char",
+    /*TYPE VOID*/        "void",
+    /*TYPE UNKNOWN*/     "UNKNOWN_TYPE"
 };
 
 void print_all_tokens(TokenBuffer* tokens, const char *buffer);

@@ -6,7 +6,7 @@ fn inc(int x): int {
     return x+1;
 }
 
-fn one() {
+fn one(): int {
     return 1;
 }
 

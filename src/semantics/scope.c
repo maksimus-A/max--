@@ -1,18 +1,23 @@
 #include <assert.h>
 #include <stdalign.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "arena/arena.h"
 #include "ast/parser/ast.h"
 #include "common.h"
+#include "debug.h"
 #include "errors/diagnostics.h"
 #include "semantics/scope.h"
 #include "semantics/walker.h"
 #include "table/ptrtable.h"
+#include "vector/vec.h"
 
 // todo: modify to accommodate 'int x;'(solved?)
+
+void print_fn_symbol_table(Resolver* res, FILE* out);
 
 // Adds symbol according to symbol_id.
 void add_symbol_to_table(Semantics* sema, Symbol* sym) {
@@ -51,6 +56,80 @@ Symbol* get_symbol(Scope* scope, SrcSpan span, Resolver* resolver) {
     return NULL;
 }
 
+Symbol* create_var_or_param_symbol(SrcSpan sym_span, SymbolKind sym_kind, enum BuiltInType type, Resolver* resolver) {
+    Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
+    symbol->symbol_span = sym_span;
+    symbol->kind = sym_kind,
+    symbol->type = type;
+    symbol->id = resolver->curr_id;
+    resolver->curr_id++;
+
+    return symbol;
+}
+
+Symbol* create_fn_symbol(SrcSpan sym_span, FnSig* fn_sig, Resolver* resolver) {
+    // todo: check this doesn't break ?? IDK. fn_sig might need to be added from arena too man.
+    Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
+    symbol->symbol_span = sym_span;
+    symbol->kind = SYM_FN;
+    symbol->fn_sig = *fn_sig;
+    symbol->id = resolver->curr_id;
+    resolver->curr_id++;
+
+    return symbol;
+}
+
+// Push scope (only once one already exists).
+Scope* push_scope(Resolver* resolver) {
+    Scope* new_scope = (Scope*)arena_alloc(resolver->arena, sizeof(Scope), alignof(Scope));
+    new_scope->parent = resolver->scope;
+    new_scope->symbols = NULL;
+    resolver->scope = new_scope;
+
+    return new_scope;
+}
+
+// First pass upon entering 'program':
+// Checks for all global 'fn' definitions.
+void collect_global_symbols(ASTNode* node, Resolver* res) {
+    ProgramInfo program = node->node_info.program;
+
+    for (int i = 0; i < program.body.count; i++) {
+        ASTNode* item = program.body.items[i];
+
+        if (item->ast_kind != AST_FN_DEC) continue;
+
+        FnDeclInfo* fn_dec = &item->node_info.fn_dec;  // <-- pointer, not copy
+
+        FnSig fn_sig = (FnSig){
+            .name = fn_dec->fn_name,
+            .ret_type = fn_dec->ret_type,
+            .param_count = fn_dec->params.count,
+        };
+
+        if (fn_sig.param_count > 0) {
+            fn_sig.param_types = arena_alloc(res->arena,
+                fn_sig.param_count * sizeof(BuiltInType),
+                alignof(BuiltInType));
+            for (size_t j = 0; j < fn_sig.param_count; j++) {
+                ParamDeclInfo param = VEC_AT_T(&fn_dec->params, ParamDeclInfo, (int)j);
+                fn_sig.param_types[j] = param.type;
+            }
+        } else {
+            fn_sig.param_types = NULL;
+        }
+
+        Symbol* fn_sym = create_fn_symbol(fn_dec->fn_name, &fn_sig, res);
+        add_symbol_to_table(res->semantics, fn_sym);
+
+        fn_dec->sym = fn_sym; // <-- bind back into AST
+
+        // Add symbol to global scope at head
+        fn_sym->next = res->scope->symbols;
+        res->scope->symbols = fn_sym;
+    }
+}
+
 // Hook that runs before visiting a node/its children.
 // user = Resolver
 WalkChildren resolver_pre(void* user, ASTNode* node) {
@@ -59,22 +138,22 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
-            // Push scope
+            // Push scope (create new)
             Scope* scope = (Scope*)arena_alloc(resolver->arena, sizeof(Scope), alignof(Scope));
             scope->parent = NULL;
             scope->symbols = NULL;
             resolver->scope = scope;
             if (resolver->debug) dump_scope_stack(resolver);
+
+            // Collect all global functions (for now. Maybe module level vars later.)
+            collect_global_symbols(node, resolver);
             break;
         }
         case AST_BLOCK:
         {
             // Push scope
-            Scope* new_scope = (Scope*)arena_alloc(resolver->arena, sizeof(Scope), alignof(Scope));
-            new_scope->parent = resolver->scope;
-            new_scope->symbols = NULL;
-            resolver->scope = new_scope;
-            if (resolver->debug) dump_scope_stack(resolver);
+            push_scope(resolver);
+
             break;
         }
         case AST_VAR_DEC: 
@@ -91,7 +170,7 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
             Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
             symbol->symbol_span = node->node_info.var_decl.name_span;
             symbol->kind = SYM_VAR;
-            symbol->var_type = node->node_info.var_decl.type;
+            symbol->type = node->node_info.var_decl.type;
             symbol->id = resolver->curr_id;
             resolver->curr_id++;
             add_symbol_to_table(resolver->semantics, symbol);
@@ -101,7 +180,6 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
             symbol->next = resolver->scope->symbols;
             resolver->scope->symbols = symbol;
 
-            if (resolver->debug) dump_scope_stack(resolver);
             break;
         }
         case AST_ASSN:
@@ -134,7 +212,51 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
                 node->node_info.assn_stmt.resolved_sym = name_symbol;
             }
 
-            if (resolver->debug) dump_scope_stack(resolver);
+            break;
+        }
+        case AST_FN_DEC:
+        {
+            // This should be declared in global scope already.
+            // But we need to orchestrate symbols for parameters existing.
+            // First push scope for parameters.
+            push_scope(resolver);
+
+            FnDeclInfo fndec = node->node_info.fn_dec;
+            for (size_t i = 0; i < fndec.params.count; i++) {
+                // Declare symbol per parameter
+                ParamDeclInfo param = VEC_AT_T(&fndec.params, ParamDeclInfo, i);
+                Symbol* param_sym = create_var_or_param_symbol(param.name, SYM_PARAM, param.type, resolver);
+                add_symbol_to_table(resolver->semantics, param_sym);
+
+                // Push symbol into scope (insert at head)
+                param_sym->next = resolver->scope->symbols;
+                resolver->scope->symbols = param_sym;
+            }
+            return WALK_CHILDREN;
+        }
+        case AST_FN_CALL:
+        {
+            // Checking if the function that is being called exists.
+            // Check for name up scope chain
+            Scope* scope = resolver->scope;
+            assert(node->node_info.fn_call.callee != NULL);
+            SrcSpan wanted = node->node_info.fn_call.callee->node_info.var_name.name_span;
+            printf("\n\nwanted span: %zu, %zu\n", wanted.start, wanted.length);
+            bool found = false;
+            while (scope != NULL) {
+                if (symbol_in_scope(scope, wanted, resolver)) {
+                    found = true;
+                    break;
+                }
+                scope = scope->parent;
+            }
+            if (!found) { // adds error to diags
+                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
+                    "Symbol '%.*s' has not been declared.", resolver->source_file);
+                break;
+            }
+            // Add symbol to CallExpr (we verified it exists)
+            node->node_info.fn_call.callee_sym = get_symbol(scope, wanted, resolver);
             break;
         }
         case AST_NAME:
@@ -162,6 +284,7 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
 
         default: break;
     }
+    if (resolver->debug) dump_scope_stack(resolver);
     return WALK_CHILDREN;
 }
 
@@ -183,6 +306,14 @@ void resolver_post(void* user, ASTNode* node) {
             resolver->scope = resolver->scope->parent;
             break;
         }
+        case AST_FN_DEC:
+        {
+
+            if (resolver->debug) dump_scope_stack(resolver);
+            // Pop scope
+            resolver->scope = resolver->scope->parent;
+            break;
+        }
 
         default: break;
     }
@@ -196,6 +327,8 @@ Visitor resolver_visitor = {
 // Main function called to resolve scope and symbols.
 void run_resolver(ASTNode* ast_root, Resolver* resolver) {
     walk_node(&resolver_visitor, resolver, ast_root);
+
+    if (resolver->debug) print_fn_symbol_table(resolver, stdout);
 }
 
 void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source* source_file, bool debug) {
@@ -240,4 +373,29 @@ void dump_scope_stack(Resolver* res) {
         depth++;
     }
     fprintf(stdout, "-----------------\n");
+}
+
+void print_fn_symbol_table(Resolver* res, FILE* out) {
+    fprintf(out, "\nFUNCTION SIGNATURE TABLE:\n");
+    PtrTable name_res = res->semantics->name_resolution;
+    for (int i = 0; i < name_res.count; i++) {
+        Symbol* sym = get_ptr_tbl(&name_res, i);
+        if (sym->kind == SYM_FN) {
+            FnSig fnsig = sym->fn_sig;
+            fprintf(out, "Symbol ID: %zu ", sym->id);
+            fprintf(out, "Function name: ");
+            print_symbol(sym->symbol_span, res->source_file);
+            fprintf(out, "  ret_type: %s, param types:", built_in_type_string[fnsig.ret_type]);
+
+            for (int j = 0; j < fnsig.param_count; j++) {
+                fprintf(out, " %s", built_in_type_string[fnsig.param_types[j]]);
+            }
+            if (fnsig.param_count == 0) fprintf(out, " N/A");
+            fprintf(out, "\n");
+        }
+        else if (sym->kind == SYM_VAR) {
+            fprintf(out, "Var Symbol ID: %zu\n", sym->id);
+        }
+    }
+    fprintf(out, "\n\n");
 }

@@ -95,11 +95,27 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
             }
             break;
         }
+        case AST_FN_DEC:
+        {
+            ASTNode* fn_body = node->node_info.fn_dec.fn_block;
+            if (fn_body == NULL) break;
+            if (walk_children == WALK_CHILDREN) walk_node(visitor, user, fn_body);
+            break;
+        }
         case AST_VAR_DEC:
         {
             ASTNode* expr = get_child_expr(node);
             if (expr && walk_children == WALK_CHILDREN) 
                 walk_node(visitor, user, expr);
+            break;
+        }
+        case AST_FN_CALL:
+        {
+            if (WALK_CHILDREN == SKIP_CHILDREN) break;
+            for (int i = 0; i < node->node_info.fn_call.args.count; i++) {
+                ASTNode* arg = VEC_AT_T(&node->node_info.fn_call.args, ASTNode*, i);
+                walk_node(visitor, user, arg);
+            }
             break;
         }
         case AST_ASSN:

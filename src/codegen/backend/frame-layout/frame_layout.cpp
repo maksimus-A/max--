@@ -44,7 +44,7 @@ public:
                 else {
                     BuiltInType sym_type;
                     if (sym->kind == SYM_VAR) {
-                        sym_type = sym->var_type;
+                        sym_type = sym->type;
                     }
 
                     // Get alignment/size of symbol (based on symbol type)
