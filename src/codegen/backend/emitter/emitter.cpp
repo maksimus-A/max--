@@ -57,7 +57,7 @@ public:
                 emit_line("\tstr ", reg(store.src), ", ", mem(FP, offset));
             },
             [&](const LIRConst& cons) {
-                emit_line("\tmov ", reg(cons.dst), ", #", cons.src);
+                emit_const(cons);
             },
             [&](const LIRRet& ret) {
                 emit_line("\tmov ", RET, ", ", reg(ret.id));
@@ -102,6 +102,18 @@ public:
             },
             [&](const auto&) {/* TODO: Implement rest of ops!*/}
         }, i.pl);
+    }
+
+    void emit_const(const LIRConst& cons) {
+        // Gonna assume all immediates are 64 bits to materialize.
+        std::int64_t val = cons.src;
+        emit_line("\tmovz ", reg(cons.dst), ", #", val & 0xFFFF, ", lsl #0");
+        for (int i = 1; i <= 3; i++) {
+            uint64_t u = (uint64_t)val;
+            std::int64_t chunk = (u >> (16*i)) & 0XFFFF;
+            if (chunk != 0)
+                emit_line("\tmovk ", reg(cons.dst), ", #", chunk, ", lsl #", 16*i);
+        }
     }
 
     void emit_op(const Operand& op) {

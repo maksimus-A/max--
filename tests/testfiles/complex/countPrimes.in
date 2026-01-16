@@ -1,4 +1,4 @@
-int N = 5000;
+int N = 1000000;
 int count = 0;
 
 int n = 2;
