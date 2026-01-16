@@ -13,6 +13,8 @@
 #define AST_DEFAULT_CAPACITY 32
 
 // todo: refactor all errors to just use 'Diagnostics'
+// todo: lots of the 'ast spans' are totally wrong.
+// i'd have to dig to make them proper.
 static void parse_item_list(Parser* parser, NodeList* list, Source* source_file, enum TokenKind stop_cond);
 char* alloc_error_ptr(Parser* parser);
 ASTNode* parse_expr(Parser* paresr, Source* source_file, int min_prec);
@@ -394,29 +396,27 @@ ASTNode* parse_postfix(Parser* parser, Source* source_file, ASTNode* lhs) {
         // Consume '('
         advance(parser);
         // Built arg list if it exists
+        // args?
         if (current(parser).token_kind != PAREN_END) {
-            // Push args into call_expr
-            // Parse first argument
             ASTNode* arg = parse_expr(parser, source_file, 0);
             VEC_PUSH_T(&call_expr.args, arg);
 
-            // Parse any additional arguments: (, expr)*
             while (current(parser).token_kind == COMMA) {
                 advance(parser); // consume ','
-
                 ASTNode* arg2 = parse_expr(parser, source_file, 0);
                 VEC_PUSH_T(&call_expr.args, arg2);
             }
+        }
 
-            if (current(parser).token_kind != PAREN_END) {
-                SrcSpan span = create_span_curr_token(parser);
-                add_diag(parser->diags, ERROR, span, "Expected ')'.", current(parser).line, current(parser).col);
-                sync_to_boundary(parser);
-            }
-            else{
-                call_end = current(parser).start;
-                advance(parser);
-            }
+        // now we MUST be at ')'
+        if (current(parser).token_kind != PAREN_END) {
+            SrcSpan span = create_span_curr_token(parser);
+            add_diag(parser->diags, ERROR, span, "Expected ')'.", current(parser).line, current(parser).col);
+            sync_to_boundary(parser);
+            call_end = lhs->span.start;
+        } else {
+            call_end = current(parser).start; // (better would be end-of-token if you have it)
+            advance(parser); // consume ')'
         }
         // Set callee (function callee)
         call_expr.callee = lhs;
@@ -944,6 +944,8 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
             push_node(parser, list, block_node);
         }
         else {
+            printf("Token kind after unknown tok:");
+            print_token_kind(current(parser).token_kind);
             add_err_msg(parser, "Unexpected token.", current(parser).line, current(parser).col);
             //TODO* Remove this once more things r implemented.
             // I want each 'parse_x' to advance the pointer to proper place
