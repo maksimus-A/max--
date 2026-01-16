@@ -82,6 +82,7 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
     // So.. I guess... Just recursively traverse the list? DFS?
     WalkChildren walk_children = WALK_UNSET;
     if (node == NULL) return;
+    // Only walk if the visitor explicitly sets walk_children to WALK_CHILDREN
     if (visitor->pre) walk_children = visitor->pre(user, node);
     switch (node->ast_kind) {
         case AST_PROGRAM:
@@ -158,6 +159,19 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
                 // Else is allowed to be null.
                 ASTNode* else_block = node->node_info.if_stmt.else_block;
                 if (else_block != NULL) walk_node(visitor, user, else_block);
+            }
+            break;
+        }
+        case AST_WHILE:
+        {
+            if (walk_children == WALK_CHILDREN) {
+                ASTNode* cond = node->node_info.while_stmt.cond;
+                assert(cond != NULL);
+                walk_node(visitor, user, cond);
+
+                ASTNode* loop_block = node->node_info.while_stmt.loop_block;
+                assert(loop_block != NULL);
+                walk_node(visitor, user, loop_block);
             }
             break;
         }

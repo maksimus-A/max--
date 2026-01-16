@@ -1,7 +1,8 @@
-int x = 0;
-int i = 0;
-while (i < 5) {
-    x = x + 2;
-    i = i + 1;
+int N = 200;
+int count = 0;
+int n = 2;
+while (n < (N+1)) {
+  count = count + 1;
+  n = n + 1;
 }
-return x; // expected 10
+return count;

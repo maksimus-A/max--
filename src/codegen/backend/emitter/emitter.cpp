@@ -108,7 +108,7 @@ public:
         if (alt<Reg>(op)) {
             emit(reg(get<Reg>(op)));
         } else if (alt<int64_t>(op)) {
-            emit(get<int64_t>(op));  // relies on ostream << int64_t
+            emit("#", get<int64_t>(op));  // relies on ostream << int64_t
         } else {
             // unreachable / diagnostic
         }

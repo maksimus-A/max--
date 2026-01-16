@@ -1,0 +1,31 @@
+// finds, for all starting numbers 1..N, which produces the longest Collatz chain length.
+int N = 1000;
+int bestStart = 1;
+int bestLen = 1;
+
+int s = 1;
+while (s < (N+1)) {
+    int n = s;
+    int len = 1;
+
+    while (n != 1) {
+        // if (n % 2 == 0) n = n/2 else n = 3n+1
+        int half = (n / 2) * 2;     // half is the largest even <= n
+        if (half == n) {
+            n = n / 2;
+        } else {
+            n = 3 * n + 1;
+        }
+        len = len + 1;
+    }
+
+    if (len > bestLen) {
+        bestLen = len;
+        bestStart = s;
+    }
+
+    s = s + 1;
+}
+
+// return something you can check:
+return bestStart; // also try returning bestLen

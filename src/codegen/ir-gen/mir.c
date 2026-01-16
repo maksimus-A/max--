@@ -2,6 +2,7 @@
 #include "arena/arena.h"
 #include "ast/lexer/lexer.h"
 #include "ast/parser/ast.h"
+#include "codegen/ir-gen/ir_types.h"
 #include "common.h"
 #include "semantics/walker.h"
 #include "table/ptrtable.h"
@@ -14,6 +15,8 @@ SlotId get_symbol_id_id(IRBuilder* builder, ASTNode* node);
 static IRValue lower_expr(IRBuilder* builder, ASTNode* expr);
 static void lower_stmt(IRBuilder* builder, ASTNode* stmt);
 void print_value_stack(FILE* output, IRBuilder* builder, ASTNode* node);
+
+
 
 // Grabs n-th function in function list.
 IRFunction* get_nth_func(Vector* funcs, int i) {
@@ -44,6 +47,10 @@ IRBlock* get_curr_block(IRBuilder* builder, IRFunction* func) {
 IRInstruct* get_nth_instruction(IRBlock* block, int i) {
     if (i >= block->instructions.count) return NULL;
     return VEC_AT_PTR_T(&block->instructions, IRInstruct, i);
+}
+
+static void add_successor(IRBuilder* builder, IRFunction* f, BlockId succ) {
+    VEC_PUSH_T(&get_curr_block(builder, f)->succs, succ);
 }
 
 // Insert instruction into proper placement in builder
@@ -467,8 +474,8 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
             // Emit branch op in current block.
             emit_branch_if_zero(builder, node, cond_val, then_block_id, nonzero_block_id);
             // Current block's successors.
-            VEC_PUSH_T(&get_curr_block(builder, f)->succs, then_block_id);
-            VEC_PUSH_T(&get_curr_block(builder, f)->succs, nonzero_block_id);
+            add_successor(builder, f, then_block_id);
+            add_successor(builder, f, nonzero_block_id);
 
             // Now we must process statements per-new block that exists.
 
@@ -480,7 +487,7 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
                 emit_jump(builder, node, join_block_id);
             }
             // Then block successor.
-            VEC_PUSH_T(&get_curr_block(builder, f)->succs, join_block_id);
+            add_successor(builder, f, join_block_id);
 
             // Else block termination
             if (else_node != NULL) {
@@ -491,7 +498,7 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
                     emit_jump(builder, node, join_block_id);
                 }
                 // Else block successor.
-                VEC_PUSH_T(&get_curr_block(builder, f)->succs, join_block_id);
+                add_successor(builder, f, join_block_id);
             }
 
             // My understanding is if I set the curr_block to join_block,
@@ -499,6 +506,53 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
             // and insert instructions into the proper block here.
             // So i think this is all.
             builder->curr_block_index = join_block_id.id;
+
+            return SKIP_CHILDREN;
+            break;
+        }
+        case AST_WHILE:
+        {
+            IRFunction* f = get_curr_func(builder);
+
+            // Create a 'header/cond' block
+            BlockId header_block_id = block_init(builder);
+            // Create loop_body block
+            BlockId loop_block_id = block_init(builder);
+            // Create join block
+            BlockId join_block_id = block_init(builder);
+
+            // Emit jump to header
+            if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
+                emit_jump(builder, node, header_block_id);
+            }
+            add_successor(builder, f, header_block_id);
+
+            // Set current block to header
+            builder->curr_block_index = header_block_id.id;
+            // Insert comparison into header
+            IRValue cond_val = lower_expr(builder, node->node_info.while_stmt.cond);
+            // True -> loop_block, false -> join_block
+            if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
+                emit_branch_if_zero(builder, node, cond_val, loop_block_id, join_block_id);
+            }
+            // Add successors to header block
+            add_successor(builder, f, loop_block_id);
+            add_successor(builder, f, join_block_id);
+
+            // Set current block to loop_body
+            builder->curr_block_index = loop_block_id.id;
+            // Lower loop body to IR
+            lower_stmt(builder, node->node_info.while_stmt.loop_block);
+            // Set terminator (Branch to header)
+            if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
+                emit_jump(builder, node, header_block_id);
+            }
+            // Add successor to loop body
+            add_successor(builder, f, header_block_id);
+
+            // Set current block to join
+            builder->curr_block_index = join_block_id.id;
+            // Done! emit normally now.
 
             return SKIP_CHILDREN;
             break;
@@ -868,6 +922,7 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, Func
 
 bool dump_mir(IRBuilder* builder, FILE* output) {
     // Goes through all instructions and prints accordingly
+    fprintf(output, "\n-------- MIR --------\n");
     size_t block_index = 0;
     for (int i = 0; i < builder->funcs.count; i++) {
         IRFunction* f = get_nth_func(&builder->funcs, i);
