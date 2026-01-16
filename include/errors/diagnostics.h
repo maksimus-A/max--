@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define DEFAULT_ERR_MSG_SIZE 200
+#define DEFAULT_ERR_MSG_SIZE 250
 
 typedef enum Severity {
     WARN,
@@ -29,9 +29,14 @@ Diagnostic* create_diag(Arena* arena, Severity sev, SrcSpan span, const char* er
 
 void push_error(Diagnostics* diags, Diagnostic* diag);
 
-// two main funcs (gonna try to only use create_and_add...)
-void add_diag(Diagnostics* diags, Severity sev, SrcSpan span, char* err_msg, size_t line, size_t col);
+// NEW BETTER DIAGNOSTIC FUNC
+void add_any_diag(Diagnostics* diags, Severity sev, SrcSpan span, Source* source_file, const char* fmt, ...);
 void create_and_add_diag_fmt(Diagnostics* diags, Severity sev, SrcSpan span, const char* fmt, Source* source_file);
+
+// two main funcs (gonna try to only use create_and_add...)
+// DEPRECCIATED?? THIS SUCKS
+void add_diag(Diagnostics* diags, Severity sev, SrcSpan span, char* err_msg, size_t line, size_t col);
+
 void diags_init(Diagnostics* diags, Arena* arena, size_t capacity);
 
 void add_diag_mir_inst(Diagnostics* diags, Severity sev, size_t inst_num, IRInstructType inst_type, char* err_msg);

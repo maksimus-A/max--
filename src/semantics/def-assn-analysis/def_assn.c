@@ -38,7 +38,19 @@ WalkChildren def_assn_pre(void* user, ASTNode* node) {
             if (!is_assigned(defassn->assigned, child_expr_id)) {
                 SrcSpan var_span = node->node_info.var_name.name_span;
                 create_and_add_diag_fmt(defassn->diags, ERROR, var_span, 
-                    "Symbol '%.*s' was not assigned/initialized before use.", defassn->source_file);
+                    "Symbol '%.*s' was not initialized before use.", defassn->source_file);
+            }
+            break;
+        }
+        case AST_FN_DEC:
+        {
+            assert(node->node_info.fn_dec.sym != NULL);
+            Symbol* fn_sym = node->node_info.fn_dec.sym;
+            for (int i = 0; i < fn_sym->fn_info.param_count; i++) {
+                // Assign each parameter a variable.
+                size_t param_id = fn_sym->fn_info.param_sym_ids[i];
+                printf("Assigning parameter: Symbol ID: %zu\n", param_id);
+                assign_variable(defassn->assigned, param_id);
             }
             break;
         }
@@ -102,7 +114,7 @@ bool definite_assignment_init(DefAssn* defassn, Diagnostics* diags, Arena* arena
 void print_bits(uint64_t value, size_t j) {
     size_t num_bits = 64;
 
-    printf("Assigned (bin), index %zu: ", j);
+    printf("Assigned (binary), index %zu: ", j);
     for (size_t i = num_bits - 1; i-- > 0; ) {
         // Create a mask with the i-th bit set to 1
         uint64_t mask = (uint64_t)1 << i;
@@ -129,6 +141,5 @@ void dump_assigned_bits(DefAssn* defassn) {
     for (size_t i = 0; i < arr_size; i++) {
         print_bits(defassn->assigned[i], i);
     }
-    printf("\n");
 }
 

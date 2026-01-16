@@ -17,6 +17,12 @@ typedef struct FnSig {
     BuiltInType* param_types; // arena owned
 } FnSig;
 
+typedef struct FnInfo {
+    FnSig sig;              // ret_type, param_types, param_count, name...
+    size_t param_count;
+    size_t* param_sym_ids;  // SymbolId array (arena allocated)
+} FnInfo;
+
 // Either var, param, or function dec.
 typedef struct Symbol {
     SrcSpan symbol_span;
@@ -26,7 +32,7 @@ typedef struct Symbol {
 
     union {
         BuiltInType type;
-        FnSig fn_sig;
+        FnInfo fn_info;
     };
 } Symbol;
 

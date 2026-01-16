@@ -44,7 +44,7 @@ Token current(Parser* parser) {
 }
 
 // Consumers
-/* Returns true if CURRENT token matches expectation (& consume), false otherwise.
+/* Returns true if CURRENT token matches expectation (& consume), false otherwise & fills err_msg.
  Used when next token is mandatory.*/
 int expect(Parser* parser, enum TokenKind kind, char* err_msg) {
     if (current(parser).token_kind == kind) {
@@ -411,7 +411,7 @@ ASTNode* parse_postfix(Parser* parser, Source* source_file, ASTNode* lhs) {
         // now we MUST be at ')'
         if (current(parser).token_kind != PAREN_END) {
             SrcSpan span = create_span_curr_token(parser);
-            add_diag(parser->diags, ERROR, span, "Expected ')'.", current(parser).line, current(parser).col);
+            add_any_diag(parser->diags, ERROR, span, source_file, "Expected ')' after %s.", token_kind_str[current(parser).token_kind]);
             sync_to_boundary(parser);
             call_end = lhs->span.start;
         } else {

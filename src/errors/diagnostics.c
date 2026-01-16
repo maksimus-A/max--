@@ -1,5 +1,6 @@
 #include "errors/diagnostics.h"
 #include "codegen/ir-gen/mir.h"
+#include "common.h"
 #include <assert.h>
 #include <stdalign.h>
 #include <stdarg.h>
@@ -57,6 +58,49 @@ char* alloc_error(Diagnostics* diags) {
                             alignof(char));
 }
 
+
+static const char* severity_to_cstr(Severity sev) {
+    switch (sev) {
+        case ERROR:   return "ERROR";
+        case WARN: return "WARNING";
+        default:      return "DIAG";
+    }
+}
+
+// Adds arbitrary diagnostic with arbitrary formatting during any frontend pass.
+// __attribute__((format(printf, 3, 4)))
+void add_any_diag(Diagnostics* diags, Severity sev, SrcSpan span, Source* source_file, const char* fmt, ...)
+{
+    char* msg = alloc_error(diags);
+    if (!msg) return;
+
+    // 1) Format the original message into a temp buffer first.
+    char inner[DEFAULT_ERR_MSG_SIZE];
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(inner, sizeof(inner), fmt, args);
+    va_end(args);
+
+    // 2) Compute line/col.
+    LineCol linecol = get_line_col_from_span(span.start, source_file);
+
+    // 3) Prepend "SEV at (line:col): "
+    snprintf(
+        msg,
+        DEFAULT_ERR_MSG_SIZE,
+        "%s at (%zu:%zu): %s",
+        severity_to_cstr(sev),
+        linecol.line,
+        linecol.col,
+        inner
+    );
+
+    Diagnostic* diag = create_diag(diags->arena, sev, span, msg);
+    if (!diag) return;
+
+    push_error(diags, diag);
+}
 // Adds error message with line/col to diagnostics item list.
 // Takes existing error, adds line/col info to beginning.
 void add_diag(Diagnostics* diags, Severity sev, SrcSpan span, char* err_msg, size_t line, size_t col) {

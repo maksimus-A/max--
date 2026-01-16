@@ -68,11 +68,16 @@ Symbol* create_var_or_param_symbol(SrcSpan sym_span, SymbolKind sym_kind, enum B
 }
 
 Symbol* create_fn_symbol(SrcSpan sym_span, FnSig* fn_sig, Resolver* resolver) {
-    // todo: check this doesn't break ?? IDK. fn_sig might need to be added from arena too man.
     Symbol* symbol = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
+    FnInfo fn_info = (FnInfo) {
+        .sig = *fn_sig,
+        .param_count = fn_sig->param_count,
+        .param_sym_ids = (size_t*)arena_alloc(resolver->arena, fn_sig->param_count * sizeof(size_t), alignof(size_t)),
+    };
+
     symbol->symbol_span = sym_span;
     symbol->kind = SYM_FN;
-    symbol->fn_sig = *fn_sig;
+    symbol->fn_info = fn_info;
     symbol->id = resolver->curr_id;
     resolver->curr_id++;
 
@@ -117,6 +122,12 @@ void collect_global_symbols(ASTNode* node, Resolver* res) {
             }
         } else {
             fn_sig.param_types = NULL;
+        }
+
+        // Check duplicate function declarations (no overloading yet).
+        if (symbol_in_scope(res->scope, fn_dec->fn_name, res)) {
+            create_and_add_diag_fmt(res->diags, ERROR, fn_dec->fn_name,
+                    "Function '%.*s' has already been declared.", res->source_file);
         }
 
         Symbol* fn_sym = create_fn_symbol(fn_dec->fn_name, &fn_sig, res);
@@ -221,12 +232,26 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
             // First push scope for parameters.
             push_scope(resolver);
 
+            Symbol* fn_sym = node->node_info.fn_dec.sym;
+            assert(fn_sym != NULL);
+
             FnDeclInfo fndec = node->node_info.fn_dec;
             for (size_t i = 0; i < fndec.params.count; i++) {
                 // Declare symbol per parameter
                 ParamDeclInfo param = VEC_AT_T(&fndec.params, ParamDeclInfo, i);
+
+                // TODO: We must first check if the symbol exists in the scope.
+                if (symbol_in_scope(resolver->scope, param.name, resolver)) {
+                    create_and_add_diag_fmt(resolver->diags, ERROR, param.name,
+                    "Symbol '%.*s' is a repeated parameter; parameter names must be unique.", resolver->source_file);
+                }
+
                 Symbol* param_sym = create_var_or_param_symbol(param.name, SYM_PARAM, param.type, resolver);
                 add_symbol_to_table(resolver->semantics, param_sym);
+
+                // Add parameter symbol to FnInfo param sym list
+                // todo: check this is i. like, an arbitrary indexer to grab ID's.
+                fn_sym->fn_info.param_sym_ids[i] = param_sym->id;
 
                 // Push symbol into scope (insert at head)
                 param_sym->next = resolver->scope->symbols;
@@ -241,22 +266,35 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
             Scope* scope = resolver->scope;
             assert(node->node_info.fn_call.callee != NULL);
             SrcSpan wanted = node->node_info.fn_call.callee->node_info.var_name.name_span;
-            printf("\n\nwanted span: %zu, %zu\n", wanted.start, wanted.length);
-            bool found = false;
+            Symbol* name_symbol = NULL;
+
             while (scope != NULL) {
-                if (symbol_in_scope(scope, wanted, resolver)) {
-                    found = true;
+                name_symbol = get_symbol(scope, wanted, resolver);
+                if (name_symbol != NULL) {
                     break;
                 }
                 scope = scope->parent;
             }
-            if (!found) { // adds error to diags
+
+            if (name_symbol == NULL) {
                 create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
                     "Symbol '%.*s' has not been declared.", resolver->source_file);
                 break;
             }
+            if (name_symbol->kind != SYM_FN){
+                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
+                    "Symbol '%.*s' is not an assignable as a function.", resolver->source_file);
+                break;
+            }
+            // Check proper calling of function w/ proper arg count
+            if (node->node_info.fn_call.args.count != name_symbol->fn_info.sig.param_count) {
+                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
+                    "Symbol '%.*s' has too many/few parameters during its call.", resolver->source_file);
+                break;
+            }
             // Add symbol to CallExpr (we verified it exists)
-            node->node_info.fn_call.callee_sym = get_symbol(scope, wanted, resolver);
+            node->node_info.fn_call.callee_sym = name_symbol;
+
             break;
         }
         case AST_NAME:
@@ -381,7 +419,7 @@ void print_fn_symbol_table(Resolver* res, FILE* out) {
     for (int i = 0; i < name_res.count; i++) {
         Symbol* sym = get_ptr_tbl(&name_res, i);
         if (sym->kind == SYM_FN) {
-            FnSig fnsig = sym->fn_sig;
+            FnSig fnsig = sym->fn_info.sig;
             fprintf(out, "Symbol ID: %zu ", sym->id);
             fprintf(out, "Function name: ");
             print_symbol(sym->symbol_span, res->source_file);
