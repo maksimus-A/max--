@@ -1,6 +1,7 @@
 // Printing LIR!
 #include "codegen/backend/lir/lir.hpp"
 #include "codegen/ir-gen/mir.h"
+#include "common.h"
 #include "common.hpp"
 
 static std::string block_label(const BlockId& bid, const FuncId& fid) {
@@ -59,7 +60,7 @@ static void print_cmp(const CmpKind& kind, std::ostream& out) {
     }
 }
 
-static void print_instruction(const LIRInstruct& inst, const BlockId& bid, const FuncId& fid, std::ostream& out_) {
+static void print_instruction(const LIRInstruct& inst, const LIRBlock& b, const LIRFunction& f, const BackendContext& ctx, std::ostream& out_) {
     if (alt<LIRStore>(inst.pl)) {
         LIRStore store = std::get<LIRStore>(inst.pl);
         out_ << "store slot(" << store.dst.id << "), ";
@@ -108,6 +109,27 @@ static void print_instruction(const LIRInstruct& inst, const BlockId& bid, const
             out_ << std::endl;
         }
     }
+    if (alt<LIRArgGet>(inst.pl)) {
+        LIRArgGet arg_get = get<LIRArgGet>(inst.pl);
+        out_ << "arg_get ";
+        print_reg(arg_get.dst, out_);
+        out_ << ", " << arg_get.src << std::endl;
+    }
+    if (alt<LIRArgPut>(inst.pl)) {
+        LIRArgPut arg_put = get<LIRArgPut>(inst.pl);
+        out_ << "arg_put " << arg_put.dst << ", ";
+        print_reg(arg_put.src, out_);
+        out_ << std::endl;
+    }
+    if (alt<LIRCall>(inst.pl)) {
+        LIRCall call = get<LIRCall>(inst.pl);
+        out_ << "call ";
+        print_reg(call.dst, out_);
+        
+        out_ << ", ";
+        ctx.print_symbol_name(call.fn_sym_id, out_);
+        out_ << ", " << call.argc << std::endl;
+    }
 }
 
 static void print_term(const std::optional<LIRTerm>& term, const BlockId& bid, const FuncId& fid, std::ostream& out) {
@@ -131,17 +153,18 @@ static void print_term(const std::optional<LIRTerm>& term, const BlockId& bid, c
 
 
 
-void print_lir(const std::vector<LIRFunction>& lir_funcs_, std::ostream& out_) {
+void print_lir(const std::vector<LIRFunction>& lir_funcs_, const BackendContext& ctx, std::ostream& out_) {
+    out_ << "\n------- LIR ------- " << "\n";
     for (auto& f: lir_funcs_) {
-        out_ << "\nLIR GENERATION: " << "\n";
-        out_ << func_label(f.id) << ":\n";
+        ctx.print_symbol_name(f.fn_sym_id, out_);
+        out_ << ":\n";
         for (auto& b: f.blocks) {
             if (b.id.id != 0)
                 out_ <<  block_label(b.id, f.id) << ":\n";
 
             for (auto& inst: b.insts) {
                 out_ << inst.inst_num << ": " << "    " ;
-                print_instruction(inst, b.id, f.id, out_);
+                print_instruction(inst, b, f, ctx, out_);
             }
             out_ << b.term->inst_num << ": ";
             out_ << "    ";

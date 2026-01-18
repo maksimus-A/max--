@@ -1,4 +1,5 @@
 #include "codegen/backend/backend_context.hpp"
+#include "common.h"
 #include <iostream>
 #include <vector>
 #include <memory>
@@ -56,7 +57,7 @@ private:
 extern "C" int run_backend_pipeline(Vector* funcs, IRModule* mod, Arena* a, Diagnostics* diags, Source* source_file, bool debug) {
     try {
         std::ofstream armout("mxout_new.s");
-        BackendContext ctx(*mod);
+        BackendContext ctx(*mod, *source_file);
         BackendDriver driver(mod, source_file, diags, debug, ctx, armout);
         driver.run(funcs);
         return 0; // Success

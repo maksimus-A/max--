@@ -34,8 +34,12 @@ struct LivenessInfo {
 
 class BackendContext {
 public:
-    BackendContext(IRModule& mod_)
-        :mod(mod_) {}
+    const IRModule& mod;
+    const Source& source_file;
+
+    
+    BackendContext(IRModule& mod_, Source& source_file_)
+        :mod(mod_), source_file(source_file_) {}
 
     // todo: maybe make these private with accessors?
     // depends on if they need to be mutated.
@@ -45,7 +49,7 @@ public:
     // Location info mapping vreg -> (preg|slot).
     std::vector<std::vector<Location>> locs;
     std::vector<std::optional<FrameInfo>> frame_info;
-    std::vector<TableView<Symbol>> slot_syms;
+    std::vector<TableView<Symbol>> slot_syms; // unused?
 
     // Returns the vector of MIR functions.
     VecView<IRFunction> mir_functions() { return VecView<IRFunction>(mod.funcs); }
@@ -61,12 +65,22 @@ public:
 
     // Table: symbol_id -> symbol
     TableView<Symbol> symbol_res() const {
-        return TableView<Symbol>(*mod.name_resolution);
+        return TableView<Symbol>(*mod.name_resolution); // name res is a bad name.
     }
 
     // Table: slot_id -> symbol (per function)
     TableView<Symbol> slot_to_symbol(const IRFunction& f) const{
         return TableView<Symbol>(f.slot_sym);
+    }
+
+    // Table: symbolId -> slotID (per function)
+    TableView<SlotId> symbol_to_slot(const IRFunction& f) const{
+        return TableView<SlotId>(f.sym_slot);
+    }
+
+    // Function arguments from a function call.
+    VecView<IRValue> fn_args(const Call& call) const {
+        return VecView<IRValue>(&call.args);
     }
 
     // Maybe store the slot sym ptr table?
@@ -92,6 +106,27 @@ public:
             }
         }, op);
         return is_imm;
+    }
+
+    // Print file slice in cpp
+    void print_file_slice(char* start, size_t length, std::ostream& out) const {
+        for (size_t i = 0; i < length; i++) {
+            out << *(start + i);
+        }
+    }
+
+    // Grabs actual string name (start pointer) from span in buffer.
+    char* start_of_name(SrcSpan span) const {
+        return &source_file.buffer[span.start];
+    }
+
+    // Prints symbol name from name resolution (which is symid->Symbol*)
+    const void print_symbol_name(size_t sym_id, std::ostream& out) const {
+        TableView<Symbol> syms = TableView<Symbol>(*mod.name_resolution);
+        Symbol sym = *syms[sym_id];
+
+        char* start = start_of_name(sym.symbol_span);
+        print_file_slice(start, sym.symbol_span.length, out);
     }
 
     // Regalloc stuff
@@ -122,7 +157,7 @@ public:
 
 
 private:
-    const IRModule& mod;
+
     
 };
 

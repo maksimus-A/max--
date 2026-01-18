@@ -191,6 +191,7 @@ public:
             [&](LIRJump& jump) {
                 // Jumps don't use vregs.
             },
+            [&](const auto&) { /* Nothing yet.*/}
         }, inst.pl);
     }
 
@@ -545,6 +546,6 @@ void regalloc(BackendContext& ctx, bool debug) {
     regalloc.add_spilled_to_insts();
     if (debug) {
         std::cout << "\n\n------ Physical register insertion/spill insertion pass ------\n" << std::endl;
-        print_lir(ctx.lir_funcs, std::cout);
+        print_lir(ctx.lir_funcs, ctx, std::cout);
     }
 }

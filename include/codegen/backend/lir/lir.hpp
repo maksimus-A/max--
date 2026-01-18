@@ -41,6 +41,37 @@ struct LIRLoad {
     SlotId src;
 };
 
+// Function stuff
+
+// Grab argument from call regs.
+struct LIRArgGet {
+
+    explicit LIRArgGet(VRegId dst_, ArgId src_)
+        : dst(dst_), src(src_) {}
+
+    Reg dst;
+    ArgId src;
+};
+
+// Put arguments into call regs.
+struct LIRArgPut {
+    explicit LIRArgPut(ArgId dst_, VRegId src_)
+        : dst(dst_), src(src_) {}
+
+    ArgId dst;
+    Reg src;
+};
+
+// Call a function.
+struct LIRCall {
+    explicit LIRCall(VRegId dst_, size_t fn_sym_id_, size_t argc_)
+        : dst(dst_), fn_sym_id(fn_sym_id_), argc(argc_) {}
+
+    Reg dst;
+    size_t fn_sym_id;
+    size_t argc; // # of args being passed
+};
+
 // Materializes immediate into register.
 struct LIRConst {
     explicit LIRConst(VRegId dst_, int64_t src_)
@@ -95,9 +126,12 @@ struct LIRJump {
     BlockId jump_to;
 };
 
+
+
 using LIRPayload = std::variant<LIRStore, LIRLoad, LIRRet, 
                             LIRConst, LIRBinOp, LIRSetCC,
-                            LIRBranch, LIRJump>;
+                            LIRBranch, LIRJump, LIRArgGet,
+                            LIRArgPut, LIRCall>;
 
 
 struct LIRInstruct {
@@ -127,8 +161,8 @@ struct LIRBlock {
 
 struct LIRFunction {
 
-    explicit LIRFunction(FuncId id_, size_t next_temp_id)
-        :id(id_), next_vreg(next_temp_id) {
+    explicit LIRFunction(FuncId id_, size_t next_temp_id, size_t fn_sym_id_)
+        :id(id_), next_vreg(next_temp_id), fn_sym_id(fn_sym_id_) {
             entry = BlockId{0}; // todo: consider some kind of wrapper to init this
             max_slot_id = 0;
         }
@@ -139,6 +173,10 @@ struct LIRFunction {
     BlockId entry;
 
     FuncId id;
+    // Honestly this shouldn't be so tied to functions but it's my only way of 
+    // printing the funciton name right now.
+    // TODO: make a FuncId -> Symbol* table in frontend.
+    size_t fn_sym_id;
 };
 
 void lower_mir_to_lir(BackendContext& ctx, bool debug);

@@ -28,7 +28,7 @@ public:
 
     // Create new function.
     void pre_func(const IRFunction& f) override {
-        lir_funcs.emplace_back(f.id, f.next_temp_id.id);
+        lir_funcs.emplace_back(f.id, f.next_temp_id.id, f.fn_sym_id);
         curr_func = &lir_funcs.back();
         
         // Insert slot_sym table into ctx
@@ -64,7 +64,9 @@ public:
             case IR_CMPOP: create_setcc(inst); break;
             case IR_JUMP: create_jump(inst); break;
             case IR_BRANCH_IF_ZERO: create_branch(inst); break;
-            default: out << "WARN: MIR -> LIR conversion for op not implemented."; break;
+            case IR_ARG: create_arg_get(inst); break;
+            case IR_CALL: create_arg_puts_and_call(inst); break;
+            default: out << "WARN: MIR -> LIR conversion for op not implemented." << std::endl; break;
         }
     }
 
@@ -79,7 +81,7 @@ private:
     // Unique per function ??
     std::size_t inst_num;
     // todo: figure out how to pass a reference of this, or store it in ctx.
-    std::vector<VRegInfo> vreg_info;
+    std::vector<VRegInfo> vreg_info; // unused??
     std::ostream& out;
 
 
@@ -138,6 +140,47 @@ private:
                 }();
 
         insert_instruction(lir_store);
+    }
+
+    // Function stuff (arguments and calls)
+
+    void create_arg_get(const IRInstruct& inst) {
+        const Arg& arg = inst.payload.arg_pl;
+
+        LIRArgGet lir_arg = LIRArgGet(VRegId{arg.dst.id}, arg.arg_id);
+        insert_instruction(lir_arg);
+    }
+
+    void create_arg_put(ArgId arg_id, VRegId vreg) {
+        LIRArgPut lir_arg_put = LIRArgPut(arg_id, vreg);
+        insert_instruction(lir_arg_put);
+    }
+
+    void create_arg_puts_and_call(const IRInstruct& inst) {
+        const Call& call = inst.payload.call_pl;
+        const VecView<IRValue> args = ctx.fn_args(call);
+
+        // Get vector of args and create 'arg_put' instructions.
+        for (int i = 0; i < args.size(); i++) {
+            const IRValue& arg = args[i];
+
+            VRegId vreg{SIZE_MAX};
+            if (arg.value_kind == IRVAL_IMM) {
+                // materialize?
+                vreg = create_const(arg.value_id.imm);
+            }
+            else if (arg.value_kind == IRVAL_TEMP) {
+                vreg.id = arg.value_id.temp_id.id;
+            }
+            create_arg_put(i, vreg);
+        }
+
+        // Because I don't support overflow/spill args YET.
+        assert(args.size() < 8);
+
+        // Create 'call' instruction
+        LIRCall lir_call = LIRCall(VRegId{call.dst.id}, call.fn_sym_id, args.size());
+        insert_instruction(lir_call);
     }
 
     // Binary operators
@@ -299,5 +342,5 @@ private:
 void lower_mir_to_lir(BackendContext& ctx, bool debug) {
     LIRGen gen(ctx, ctx.lir_funcs, std::cout);
     walk_mir_linear(ctx, gen);
-    if (debug) print_lir(gen.lir_funcs, std::cout);
+    if (debug) print_lir(gen.lir_funcs, ctx, std::cout);
 }
