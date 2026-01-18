@@ -94,10 +94,19 @@ Scope* push_scope(Resolver* resolver) {
     return new_scope;
 }
 
-// First pass upon entering 'program':
-// Checks for all global 'fn' definitions.
-void collect_global_symbols(ASTNode* node, Resolver* res) {
+// True if symbol passed is 'main'.
+static bool is_main_fn(SrcSpan fn_name, Resolver* resolver) {
+    if (fn_name.length != 4) return false;
+
+    const char* name_start = start_of_name(fn_name, resolver->source_file);
+    return memcmp(name_start, "main", 4) == 0;
+}
+
+//* First pass upon entering 'program':
+//* Checks for all global 'fn' definitions.
+static void collect_global_symbols(ASTNode* node, Resolver* res) {
     ProgramInfo program = node->node_info.program;
+    bool main_found = false;
 
     for (int i = 0; i < program.body.count; i++) {
         ASTNode* item = program.body.items[i];
@@ -105,6 +114,8 @@ void collect_global_symbols(ASTNode* node, Resolver* res) {
         if (item->ast_kind != AST_FN_DEC) continue;
 
         FnDeclInfo* fn_dec = &item->node_info.fn_dec;  // <-- pointer, not copy
+
+        if (is_main_fn(fn_dec->fn_name, res)) main_found = true;
 
         FnSig fn_sig = (FnSig){
             .name = fn_dec->fn_name,
@@ -138,6 +149,11 @@ void collect_global_symbols(ASTNode* node, Resolver* res) {
         // Add symbol to global scope at head
         fn_sym->next = res->scope->symbols;
         res->scope->symbols = fn_sym;
+    }
+
+    // Check if 'main' was found
+    if (!main_found) {
+        add_any_diag(res->diags, ERROR, node->span, res->source_file, "Function \"main\" must be declared in the program.");
     }
 }
 
