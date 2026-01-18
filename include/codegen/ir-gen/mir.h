@@ -6,7 +6,6 @@
 #include "codegen/ir-gen/ir_types.h"
 #include <stdint.h>
 
-
 // TODO: UNUSED
 typedef enum IRTerminator {
     IR_TERM_RETURN,
@@ -47,6 +46,15 @@ typedef struct IRValue {
 /* ------ Instruction payload helpers ------*/
 
 /* ------ Instruction payloads ------*/
+
+typedef size_t ArgId;
+
+// Kind of like a load but only for function arguments.
+typedef struct Arg {
+    TempId dst;
+    ArgId arg_id;
+} Arg;
+
 typedef struct Store { 
     SlotId dst;
     IRValue src;
@@ -57,8 +65,11 @@ typedef struct Load {
     SlotId src;
 } Load;
 
-// TODO: Refactor to 'return' once functions exist.
-typedef struct Halt { // comes from exit(0), placeholder for 'return;'
+// Exists for all functions.
+// Really means 'ret' not halt.
+// Bad naming from previous iterations.
+// TODO: Rename halt to 'ret'. Halt is just bad naming.
+typedef struct Halt { 
     IRValue code; 
 } Halt;
 
@@ -106,6 +117,12 @@ typedef struct Branch {
 typedef struct Jump {
     BlockId jump_to;
 } Jump;
+
+typedef struct Call {
+    TempId dst;
+    size_t fn_sym_id;
+    Vector args; // vec<IRValue>
+} Call;
 /* ------ Instruction payloads ------*/
 
 // Each "vector" will be cast to the proper type
@@ -120,12 +137,16 @@ typedef struct IRInstruct {
 
         // Operations
         BinOp binop_pl;
-        Cmp cmp_pl; // todo: unused
+        Cmp cmp_pl;
 
         // Terminator payloads
         Halt halt_payload;
         Branch br_pl;
         Jump jump_pl;
+
+        // Function arg payload
+        Arg arg_pl;
+        Call call_pl; 
     } payload;
 
     size_t ast_id;
@@ -158,8 +179,10 @@ typedef struct IRFunction {
 
     // TODO: Separate per-func slot id from global slot id.
     size_t next_slot_id;
+    ArgId next_arg_id;
     // Guarantee: slot id's are dense, and slot_index == slot_id.
     PtrTable slot_sym; // maps slot_id -> Symbol.
+    PtrTable sym_slot; // maps symbolID -> slotID (NEW)
 
     // starting block in function
     BlockId entry;
@@ -170,6 +193,8 @@ typedef struct IRFunction {
 
     // Funciton ID
     FuncId id;
+    // Function Symbol ID MAN.
+    size_t fn_sym_id;
 } IRFunction;
 
 typedef struct IRBuilder {

@@ -10,5 +10,7 @@ typedef enum IRInstructType {
     // todo: move this to IRTerminator list.
     IR_HALT, // terminates program with status code. (currently return 0;)
     // no instructions allowed after exit.
+    IR_ARG, // For argument loading.
+    IR_CALL, // function call
     IR_UNDEFINED
 } IRInstructType;

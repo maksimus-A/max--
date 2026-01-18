@@ -10,9 +10,14 @@ fn one(): int {
     return 1;
 }
 
+fn fake(): void {
+
+}
+
 fn main(): int {
     int x = 1;
     int y = 2;
+    fake();
     int z = add(x, y) + add(inc(inc(x)), one()) * 2;
 
     return z;

@@ -111,7 +111,7 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
         }
         case AST_FN_CALL:
         {
-            if (WALK_CHILDREN == SKIP_CHILDREN) break;
+            if (walk_children == SKIP_CHILDREN) break;
             for (int i = 0; i < node->node_info.fn_call.args.count; i++) {
                 // vector of expr nodes
                 ASTNode* arg = VEC_AT_T(&node->node_info.fn_call.args, ASTNode*, i);

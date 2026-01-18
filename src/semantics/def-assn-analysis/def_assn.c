@@ -7,6 +7,10 @@
 #include <stdint.h>
 #include <string.h>
 
+// TODO** this whole thing is broken. Doesn't really account for per-function scopes,
+// is only linear/doesn't traverse CFG, needs a huge refactor that I don't wanna do.
+// probably easiest to move the entire pass to post-MIR generation.
+
 // Checks if the bit in the bitset pertaining to the 'id' of the
 // local variable is set to 1 (implying it was assigned/initialized).
 bool is_assigned(uint64_t* assigned, size_t var_id) {
@@ -49,7 +53,6 @@ WalkChildren def_assn_pre(void* user, ASTNode* node) {
             for (int i = 0; i < fn_sym->fn_info.param_count; i++) {
                 // Assign each parameter a variable.
                 size_t param_id = fn_sym->fn_info.param_sym_ids[i];
-                printf("Assigning parameter: Symbol ID: %zu\n", param_id);
                 assign_variable(defassn->assigned, param_id);
             }
             break;

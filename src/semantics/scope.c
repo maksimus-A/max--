@@ -47,7 +47,7 @@ bool symbol_in_scope(Scope* scope, SrcSpan span, Resolver* resolver) {
 }
 
 // Returns symbol (if it exists inside scope)
-Symbol* get_symbol(Scope* scope, SrcSpan span, Resolver* resolver) {
+static Symbol* get_symbol(Scope* scope, SrcSpan span, Resolver* resolver) {
     Symbol* symbol = scope->symbols;
     while (symbol != NULL) {
         if (symbols_eq(symbol->symbol_span, span, resolver->source_file)) return symbol;

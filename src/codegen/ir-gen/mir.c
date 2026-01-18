@@ -11,12 +11,59 @@
 
 TempId create_temp_id(IRBuilder* builder);
 bool emit_load(IRBuilder* builder, ASTNode* node, TempId dst, SlotId src);
-SlotId get_symbol_id_id(IRBuilder* builder, ASTNode* node);
+static Symbol* get_symbol(IRBuilder* builder, ASTNode* node);
 static IRValue lower_expr(IRBuilder* builder, ASTNode* expr);
 static void lower_stmt(IRBuilder* builder, ASTNode* stmt);
 void print_value_stack(FILE* output, IRBuilder* builder, ASTNode* node);
 
+// Slot symbol or Symbol slot helpers.
 
+SlotId get_next_slot(IRFunction* f) {
+    return (SlotId) {.id=f->next_slot_id++};
+}
+
+// Returns NULLABLE symbol from symbol table (check if exists).
+// Useful for debugging/printing; not during generation really.
+Symbol* symbol_from_slot_sym(IRFunction* f, SlotId slot) {
+    Symbol* sym = get_ptr_tbl(&f->slot_sym, slot.id);
+    return sym;
+}
+
+// Create SlotId, map it to slot_sym table, and return the slot.
+SlotId create_and_map_slot_to_sym(IRFunction* f, Symbol* sym) {
+    // Add 1 to function slot count for later, and
+    // add slot_id to function slots table.
+    SlotId lhs_slot = get_next_slot(f);
+
+    // Gets symbol from node, sets slot_i to symbol for function (LHS)
+    set_ptr_tbl(&f->slot_sym, sym, lhs_slot.id);
+
+    return lhs_slot;
+}
+
+// Maps the given SymbolID -> SlotID.
+void map_sym_to_slot(IRBuilder* builder, IRFunction* f, size_t sym_id, SlotId slot_val) {
+    // Allocate persistent memory for the ID
+    SlotId* stored_slot = arena_alloc(builder->arena, sizeof(SlotId), alignof(SlotId));
+    *stored_slot = slot_val;
+    
+    // Store the valid pointer
+    set_ptr_tbl(&f->sym_slot, stored_slot, sym_id);
+}
+
+// Checks if SlotId exists in table. If it does, return that one.
+// If not, create its entry and return that new entry.
+SlotId slot_from_sym_slot(IRBuilder* builder, IRFunction* f, size_t sym_id) {
+    SlotId* slot_p = get_ptr_tbl(&f->sym_slot, sym_id);
+    if (slot_p == NULL) {
+        // Create new entry.
+        SlotId slot = get_next_slot(f);
+        // Fix: Pass builder and pass 'slot' by value
+        map_sym_to_slot(builder, f, sym_id, slot); 
+        return slot;
+    }
+    return *slot_p;
+}
 
 // Grabs n-th function in function list.
 IRFunction* get_nth_func(Vector* funcs, int i) {
@@ -52,6 +99,7 @@ IRInstruct* get_nth_instruction(IRBlock* block, int i) {
 static void add_successor(IRBuilder* builder, IRFunction* f, BlockId succ) {
     VEC_PUSH_T(&get_curr_block(builder, f)->succs, succ);
 }
+
 
 // Insert instruction into proper placement in builder
 // (should be holding a pointer to current func/block).
@@ -110,11 +158,16 @@ IRValue emit_rvalue(IRBuilder* builder, ASTNode* node) {
         {
             val.value_kind = IRVAL_TEMP;
             IRFunction* f = get_curr_func(builder);
+
+            // Get symbol of name
+            Symbol* name_sym = node->node_info.var_name.resolved_sym;
+            assert(name_sym != NULL);
+
             // Construct new temp
             TempId temp = create_temp_id(builder);
             val.value_id.temp_id = temp;
             // Emit a load here with the temp we create.
-            SlotId var_slot = get_symbol_id_id(builder, node);
+            SlotId var_slot = slot_from_sym_slot(builder, f, name_sym->id);
             assert(var_slot.id != SIZE_MAX);
             emit_load(builder, node, temp, var_slot);
             break;
@@ -127,35 +180,40 @@ IRValue emit_rvalue(IRBuilder* builder, ASTNode* node) {
     return val;
 }
 
-// Returns slot ID for current LHS variable.
-SlotId get_symbol_id_id(IRBuilder* builder, ASTNode* node) {
-    SlotId slot_id = {0};
+// Returns symbol for current LHS variable.
+static Symbol* get_symbol(IRBuilder* builder, ASTNode* node) {
     switch (node->ast_kind) {
         case (AST_NAME):
         {
             assert(node->node_info.var_name.resolved_sym && "unresolved identifier in MIR gen");
 
-            slot_id.id = node->node_info.var_name.resolved_sym->id;
+            return node->node_info.var_name.resolved_sym;
             break;
         }
         case AST_VAR_DEC:
         {
-            slot_id.id = node->node_info.var_decl.symbol->id;
+            return node->node_info.var_decl.symbol;
             break;
         }
         case AST_ASSN:
         {
-            slot_id.id = node->node_info.assn_stmt.resolved_sym->id;
+            return node->node_info.assn_stmt.resolved_sym;
+            break;
+        }
+        case AST_FN_DEC:
+        {
+            return node->node_info.fn_dec.sym;
             break;
         }
         default:
         {
-            slot_id.id = SIZE_MAX; // error
+            return NULL; // error
             break;
         }
     }
-    return slot_id;
+    return NULL; // error
 }
+
 
 // Grabs our IR value from the stack.
 IRValue get_ir_value_stack(IRBuilder* builder) {
@@ -363,6 +421,47 @@ bool emit_jump(IRBuilder* builder, ASTNode* node, BlockId jump_to) {
     }
     return true;
 }
+
+TempId emit_arg(IRBuilder* builder, const Symbol* sym) {
+    TempId temp = create_temp_id(builder);
+    Arg arg = (Arg) {
+        .arg_id = get_curr_func(builder)->next_arg_id++,
+        .dst = temp
+    };
+
+    IRInstruct arg_inst = (IRInstruct) {
+        .type = IR_ARG,
+        .span = sym->symbol_span,
+        .ast_id = SIZE_MAX, // Default because args don't come from the AST.
+        .payload.arg_pl = arg
+    };
+
+    if (!insert_instruction(builder, arg_inst)) {
+        SrcSpan fake_span = (SrcSpan) {.start=0, .length=0};
+        add_diag(builder->diags, ERROR, fake_span, 
+        "Failed to insert 'arg' instruction into builder.", 0, 0);
+        return (TempId){.id=SIZE_MAX};
+    }
+    return temp;
+
+}
+
+bool emit_call(IRBuilder* builder, Call* call, ASTNode* node) {
+    IRInstruct call_inst = (IRInstruct) {
+        .type = IR_CALL,
+        .span = node->span,
+        .ast_id = node->id,
+        .payload.call_pl = *call
+    };
+
+
+    if (!insert_instruction(builder, call_inst)) {
+        add_diag(builder->diags, ERROR, node->span,
+        "Failed to insert 'call' instruction into builder.", 0, 0);
+        return false;
+    }
+    return true;
+}
 /*------ Instruction Emissions ------*/
 
 
@@ -403,7 +502,7 @@ BlockId block_init_in_func(IRBuilder* b, IRFunction* f) {
 
 // Initializes an IRFunction, including an entry block,
 // and inserts it into builder.
-void begin_function(IRBuilder* builder) {
+void begin_function(IRBuilder* builder, size_t fn_sym_id) {
 
     IRFunction func = {0};
     // Create blocks vector
@@ -421,6 +520,10 @@ void begin_function(IRBuilder* builder) {
     // Set next slot id to 0 (separate from symbol ID).
     func.next_slot_id = 0;
     ptr_table_init(&func.slot_sym, builder->arena);
+    ptr_table_init(&func.sym_slot, builder->arena);
+
+    // Set function symbol ID
+    func.fn_sym_id = fn_sym_id;
 
     // push function into builder
     VEC_PUSH_T(&builder->funcs, func);
@@ -438,9 +541,37 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
-            // Create function.
-            begin_function(builder);
+            // todo: could create implicit function? IDK. Probably not a good idea.
             break;
+        }
+        case AST_FN_DEC: {
+            // Create function (this sets new curr_func, inserts into builder, creates entry block, etc)
+            begin_function(builder, node->node_info.fn_dec.sym->id);
+            IRFunction* f = get_curr_func(builder);
+            // Emit 'arg' ops for all args per function.
+            const Symbol* fn_sym = node->node_info.fn_dec.sym;
+            assert(fn_sym != NULL);
+            for (size_t i = 0; i < fn_sym->fn_info.param_count; i++) {
+                Symbol* param_sym = get_ptr_tbl(&builder->sema->name_resolution, fn_sym->fn_info.param_sym_ids[i]);
+                TempId temp = emit_arg(builder, param_sym);
+
+                // Emit store arg into slot?
+                SlotId dst = slot_from_sym_slot(builder, f, param_sym->id);
+                set_ptr_tbl(&f->slot_sym, param_sym, dst.id);
+
+                IRValue val = (IRValue) {
+                    .value_kind = IRVAL_TEMP,
+                    .value_type = param_sym->type,
+                    .value_id.temp_id = temp
+                };
+                emit_store(builder, node, dst, val);
+            }
+            return WALK_CHILDREN;
+            break;
+        }
+        case AST_FN_CALL:
+        {
+            return SKIP_CHILDREN;
         }
         case AST_IF:
         {
@@ -565,10 +696,46 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
 void mir_gen_post(void* user, ASTNode* node) {
     IRBuilder* builder = (IRBuilder*) user;
 
+
     switch (node->ast_kind) {
         case AST_PROGRAM:
         {
             // Exit program.
+            break;
+        }
+        case AST_FN_CALL:
+        {
+            
+            IRFunction* f = get_curr_func(builder);
+
+            TempId dst = create_temp_id(builder);
+            size_t fn_sym_id = node->node_info.fn_call.callee_sym->id;
+            Call call = (Call) {
+                .dst = dst,
+                .fn_sym_id = fn_sym_id
+            };
+            // init IRValue vec
+            VEC_INIT_T(&call.args, builder->arena, IRValue);
+
+
+            for (int i = 0; i < node->node_info.fn_call.args.count; i++) {
+                // Lower function parameter
+                ASTNode* expr = VEC_AT_T(&node->node_info.fn_call.args, ASTNode*, i);
+                IRValue val = lower_expr(builder, expr);
+
+                // Insert into IRValue vec?
+                VEC_PUSH_T(&call.args, val);
+            }
+
+            emit_call(builder, &call, node);
+
+            // Push the result of the call onto the stack
+            IRValue call_result = (IRValue){
+                .value_kind = IRVAL_TEMP,
+                .value_type = node->node_info.fn_call.callee_sym->type,
+                .value_id.temp_id = dst
+            };
+            VEC_PUSH_T(&builder->val_stack, call_result);
             break;
         }
         case AST_BLOCK:
@@ -577,17 +744,17 @@ void mir_gen_post(void* user, ASTNode* node) {
             break;
         }
         case AST_VAR_DEC: 
+        // DONE REFACTOR
         {
-            // slot of RHS
-            SlotId lhs_slot = get_symbol_id_id(builder, node);
-
-            // Add 1 to function slot count for later, and
-            // add slot_id to function slots table.
             IRFunction* f = get_curr_func(builder);
+            Symbol* sym = get_symbol(builder, node);
+
+            // Create slot and map REVERSE (Slot -> Sym)
+            SlotId lhs_slot = create_and_map_slot_to_sym(f, sym);
             
-            // Gets symbol from node, sets slot_i to symbol for function (LHS)
-            set_ptr_tbl(&f->slot_sym, node->node_info.var_decl.symbol, f->next_slot_id);
-            f->next_slot_id++;
+            // Map FORWARD (Sym -> Slot) using the new safe function
+            // Pass 'lhs_slot' by value, not address &lhs_slot
+            map_sym_to_slot(builder, f, sym->id, lhs_slot);
 
             assert(lhs_slot.id != SIZE_MAX);
 
@@ -604,8 +771,12 @@ void mir_gen_post(void* user, ASTNode* node) {
         }
         case AST_ASSN:
         {
-            // slot of RHS
-            SlotId lhs_slot = get_symbol_id_id(builder, node);
+            // DONE REFACTOR
+            IRFunction* f = get_curr_func(builder);
+            Symbol* sym = get_symbol(builder, node);
+
+            // Use the safe lookup that creates if missing
+            SlotId lhs_slot = slot_from_sym_slot(builder, f, sym->id);
             assert(lhs_slot.id != SIZE_MAX);
 
             // Pop the value we need from the value stack.
@@ -784,27 +955,27 @@ void print_cmp(CmpKind kind, FILE* output) {
     fprintf(output, "%s", cmp_name);
 }
 
-void print_slot(IRBuilder* builder, size_t symbol_id, FILE* output) {
-    PtrTable name_res = builder->sema->name_resolution;
-    Symbol* var_symbol = get_ptr_tbl(&name_res, symbol_id);
+// TODO: Refactor to use sym_slot instead.
+void print_slot_with_id(IRBuilder* builder, IRFunction* f, SlotId slot, FILE* output) {
+
+    Symbol* var_symbol = get_ptr_tbl(&f->slot_sym, slot.id);
+    assert(var_symbol != NULL);
     SrcSpan name_span = var_symbol->symbol_span;
     char* name_ptr = start_of_name(name_span, builder->source_file);
     fprintf(output, "slot(");
     print_file_slice(name_ptr, name_span.length, output);
-    fprintf(output, ")");
+    fprintf(output, ":%zu)", slot.id);
 }
 
-void print_slot_with_id(IRBuilder* builder, size_t symbol_id, FILE* output) {
+void print_function_name(IRBuilder* builder, size_t fn_sym_id, FILE* output) {
     PtrTable name_res = builder->sema->name_resolution;
-    Symbol* var_symbol = get_ptr_tbl(&name_res, symbol_id);
+    Symbol* var_symbol = get_ptr_tbl(&name_res, fn_sym_id);
     SrcSpan name_span = var_symbol->symbol_span;
     char* name_ptr = start_of_name(name_span, builder->source_file);
-    fprintf(output, "slot(");
     print_file_slice(name_ptr, name_span.length, output);
-    fprintf(output, ":%zu)", symbol_id);
 }
 
-void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, FuncId fid) {
+void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, IRFunction* f) {
     switch (instr->type) {
         case IR_LOAD:
         {
@@ -812,7 +983,7 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, Func
             // todo: change slot to be actual variable, not int.
             Load load = instr->payload.load_payload;
             fprintf(output, "load t%zu, ", load.dst.id);
-            print_slot_with_id(builder, load.src.id, output);
+            print_slot_with_id(builder, f, load.src, output);
             break;
         }
         case IR_STORE:
@@ -821,12 +992,12 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, Func
             Store store = instr->payload.store_payload;
             if (store.src.value_kind == IRVAL_IMM) {
                 fprintf(output, "store ");
-                print_slot_with_id(builder, store.dst.id, output);
+                print_slot_with_id(builder, f, store.dst, output);
                 fprintf(output, ", %lld", store.src.value_id.imm);
             }
             else if (store.src.value_kind == IRVAL_TEMP) {
                 fprintf(output, "store ");
-                print_slot_with_id(builder, store.dst.id, output);
+                print_slot_with_id(builder, f, store.dst, output);
                 fprintf(output, ", t%zu", store.src.value_id.temp_id.id);
             }
             break;
@@ -880,12 +1051,13 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, Func
         // TERMINATORS
         case IR_HALT:
         {
+            // TODO: Rename halt to 'ret'. Halt is just bad naming.
             Halt halt = instr->payload.halt_payload;
             if (halt.code.value_kind == IRVAL_IMM) {
-                fprintf(output, "halt %lld", halt.code.value_id.imm);
+                fprintf(output, "ret %lld", halt.code.value_id.imm);
             }
             else if (halt.code.value_kind == IRVAL_TEMP) {
-                fprintf(output, "halt t%zu", halt.code.value_id.temp_id.id);
+                fprintf(output, "ret t%zu", halt.code.value_id.temp_id.id);
             }
             break;
         }
@@ -898,9 +1070,9 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, Func
             else if (br.cmp.value_kind == IRVAL_TEMP) {
                 fprintf(output, "branch t%zu ", br.cmp.value_id.temp_id.id);
             }
-            print_block_label(output, fid, br.non_zero); // true br
+            print_block_label(output, f->id, br.non_zero); // true br
             fprintf(output, " ");
-            print_block_label(output, fid, br.zero); // false br
+            print_block_label(output, f->id, br.zero); // false br
 
             break;
         }
@@ -908,12 +1080,39 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, Func
         {
             Jump jump = instr->payload.jump_pl;
             fprintf(output, "jump ");
-            print_block_label(output, fid, jump.jump_to);
+            print_block_label(output, f->id, jump.jump_to);
+            break;
+        }
+        // FUNCTION STUFF
+        case IR_ARG:
+        {
+            Arg arg = instr->payload.arg_pl;
+            fprintf(output, "arg t%zu, index:%zu", arg.dst.id, arg.arg_id);
+            break;
+        }
+        case IR_CALL:
+        {
+            Call call = instr->payload.call_pl;
+            fprintf(output, "call t%zu, ", call.dst.id);
+            print_function_name(builder, call.fn_sym_id, output);
+            fprintf(output, ", ");
+            for (int i = 0; i < call.args.count; i++) {
+                IRValue val = VEC_AT_T(&call.args, IRValue, i);
+                if (val.value_kind == IRVAL_IMM) {
+                    fprintf(output, "%llu", val.value_id.imm);
+                }
+                else if (val.value_kind == IRVAL_TEMP) {
+                    fprintf(output, "t%zu", val.value_id.temp_id.id);
+                }
+                if (i != call.args.count-1)
+                    fprintf(output, ", ");
+            }
             break;
         }
         case IR_UNDEFINED:
         {
             fprintf(output, "ERROR: Op not created/found (likely missing terminator).");
+            break;
         }
         
     }
@@ -926,10 +1125,12 @@ bool dump_mir(IRBuilder* builder, FILE* output) {
     size_t block_index = 0;
     for (int i = 0; i < builder->funcs.count; i++) {
         IRFunction* f = get_nth_func(&builder->funcs, i);
-        fprintf(output, "function_%zu:\n", f->id.id);
+        fprintf(output, "\n");
+        print_function_name(builder, f->fn_sym_id, output);
+        fprintf(output, ":\n");
 
         for (int j = 0; j < f->blocks.count; j++) {
-            fprintf(output, "\n  ");
+            fprintf(output, "  ");
             IRBlock* b = get_nth_block(f, j);
             print_block_label(output, f->id, b->id);
             fprintf(output, ":\n");
@@ -937,11 +1138,11 @@ bool dump_mir(IRBuilder* builder, FILE* output) {
             for (int k = 0; k < b->instructions.count; k++) {
                 fprintf(output, "    ");
                 IRInstruct* instruction = get_nth_instruction(b, k);
-                print_instruction(builder, instruction, output, f->id);
+                print_instruction(builder, instruction, output, f);
             }
             // Print terminator
             fprintf(output, "    ");
-            print_instruction(builder, &b->term, output, f->id);
+            print_instruction(builder, &b->term, output, f);
         }
     }
     fprintf(output, "\n");
