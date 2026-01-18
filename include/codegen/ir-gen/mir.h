@@ -69,7 +69,8 @@ typedef struct Load {
 // Really means 'ret' not halt.
 // Bad naming from previous iterations.
 // TODO: Rename halt to 'ret'. Halt is just bad naming.
-typedef struct Halt { 
+typedef struct Halt {
+    bool has_value;
     IRValue code; 
 } Halt;
 
@@ -162,7 +163,8 @@ typedef struct IRBlock {
     Vector instructions;
     BlockId id;
 
-    IRInstruct term; // TODO: Refactor LIR gen to see this/use this.
+    bool has_term;
+    IRInstruct term;
 
     Vector preds; // BlockId's
     Vector succs; // BlockId's
@@ -193,8 +195,10 @@ typedef struct IRFunction {
 
     // Funciton ID
     FuncId id;
-    // Function Symbol ID MAN.
+    // Function Symbol ID.
     size_t fn_sym_id;
+    // Function return type.
+    BuiltInType ret_type; // todo unused
 } IRFunction;
 
 typedef struct IRBuilder {

@@ -137,7 +137,7 @@ typedef struct CallExprInfo {
 // Exit (turns into return now.)
 typedef struct ExitInfo {
     SrcSpan func_span;
-    ASTNode* expr;
+    ASTNode* expr; // NULL == no_value
 } ExitInfo;
 
 

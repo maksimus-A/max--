@@ -10,14 +10,30 @@ fn one(): int {
     return 1;
 }
 
-fn fake(): void {
+fn fake() {
 
+}
+
+fn retTest(): int {
+    int x = 1;
+    int y = 2;
+    if (x == 1) {
+        return x;
+    }
+    
+    x = x + 1;
+    return x;
 }
 
 fn main(): int {
     int x = 1;
     int y = 2;
+
+    // Void function tests
     fake();
+    retTest();
+
+    // Nested function call tests
     int z = add(x, y) + add(inc(inc(x)), one()) * 2;
 
     return z;

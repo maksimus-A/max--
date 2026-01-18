@@ -210,9 +210,13 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
         case AST_EXIT:
         {
             printf("Exit id={%d}\n", (int)node->id);
-            indent++;
-            dump_ast(node->node_info.exit_info.expr, source_file, indent);
-            indent--;
+
+            ASTNode* exit_expr = node->node_info.exit_info.expr;
+            if (exit_expr != NULL) {
+                indent++;
+                dump_ast(node->node_info.exit_info.expr, source_file, indent);
+                indent--;
+            }
             print_indentation(indent);
             printf(")\n");
             break;

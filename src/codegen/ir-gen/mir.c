@@ -133,6 +133,7 @@ static bool insert_terminator(IRBuilder* builder, IRInstruct inst) {
     IRBlock* b = get_curr_block(builder, f);
     // Add terminator to current block.
     b->term = inst;
+    b->has_term = true;
 
     return true;
 }
@@ -361,8 +362,9 @@ static bool emit_cmpop(IRBuilder* builder, ASTNode* node, TempId dst, IRValue lh
     return true;
 }
 
-bool emit_halt(IRBuilder* builder, ASTNode* node, IRValue ir_val) {
+bool emit_halt_with_val(IRBuilder* builder, ASTNode* node, IRValue ir_val) {
     Halt halt = (Halt) {
+        .has_value = true,
         .code = ir_val
     };
 
@@ -374,7 +376,26 @@ bool emit_halt(IRBuilder* builder, ASTNode* node, IRValue ir_val) {
     };
     if (!insert_terminator(builder, halt_inst)) {
         add_diag(builder->diags, ERROR, node->span, 
-        "Failed to insert 'halt' instruction into builder.", 0, 0);
+        "Failed to insert 'halt (with_ret)' instruction into builder.", 0, 0);
+        return false;
+    }
+    return true;
+}
+
+bool emit_halt_no_val(IRBuilder* builder, ASTNode* node) {
+    Halt halt = (Halt) {
+        .has_value = false,
+    };
+
+    IRInstruct halt_inst = (IRInstruct) {
+        .type = IR_HALT,
+        .ast_id = node->id,
+        .payload.halt_payload = halt,
+        .span = node->span,
+    };
+    if (!insert_terminator(builder, halt_inst)) {
+        add_diag(builder->diags, ERROR, node->span, 
+        "Failed to insert 'halt (no_ret)' instruction into builder.", 0, 0);
         return false;
     }
     return true;
@@ -477,6 +498,7 @@ BlockId block_init(IRBuilder* b) {
     IRBlock blk = {0};
     blk.id.id = f->blocks.count;     // <-- next index
     blk.term.type = IR_UNDEFINED;
+    blk.has_term = false;
     VEC_INIT_T(&blk.instructions, b->arena, IRInstruct);
     VEC_INIT_T(&blk.preds, b->arena, BlockId);
     VEC_INIT_T(&blk.succs, b->arena, BlockId);
@@ -502,7 +524,7 @@ BlockId block_init_in_func(IRBuilder* b, IRFunction* f) {
 
 // Initializes an IRFunction, including an entry block,
 // and inserts it into builder.
-void begin_function(IRBuilder* builder, size_t fn_sym_id) {
+void begin_function(IRBuilder* builder, size_t fn_sym_id, BuiltInType ret_type) {
 
     IRFunction func = {0};
     // Create blocks vector
@@ -525,6 +547,9 @@ void begin_function(IRBuilder* builder, size_t fn_sym_id) {
     // Set function symbol ID
     func.fn_sym_id = fn_sym_id;
 
+    //Set function return type
+    func.ret_type = ret_type;
+
     // push function into builder
     VEC_PUSH_T(&builder->funcs, func);
 
@@ -546,7 +571,7 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
         }
         case AST_FN_DEC: {
             // Create function (this sets new curr_func, inserts into builder, creates entry block, etc)
-            begin_function(builder, node->node_info.fn_dec.sym->id);
+            begin_function(builder, node->node_info.fn_dec.sym->id, node->node_info.fn_dec.ret_type);
             IRFunction* f = get_curr_func(builder);
             // Emit 'arg' ops for all args per function.
             const Symbol* fn_sym = node->node_info.fn_dec.sym;
@@ -566,6 +591,10 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
                 };
                 emit_store(builder, node, dst, val);
             }
+
+            // Walk body manually (so i can check void ret type easily?)
+            // ASTNode* fn_body = node->node_info.fn_dec.fn_block;
+            // lower_stmt(builder, fn_body);
             return WALK_CHILDREN;
             break;
         }
@@ -701,6 +730,20 @@ void mir_gen_post(void* user, ASTNode* node) {
         case AST_PROGRAM:
         {
             // Exit program.
+            break;
+        }
+        case AST_FN_DEC:
+        {
+            // check if fn return type is 'void'.
+            // If it is, and no return statement exists,
+            // implciitly add one.
+            IRFunction* f = get_curr_func(builder);
+            IRBlock* b = get_curr_block(builder, f);
+            if (!b->has_term && f->ret_type == TYPE_VOID) {
+                // Insert implicit return
+                emit_halt_no_val(builder, node);
+            }
+
             break;
         }
         case AST_FN_CALL:
@@ -843,14 +886,21 @@ void mir_gen_post(void* user, ASTNode* node) {
         }
         case AST_EXIT:
         {
-            // Pop the value we need from the value stack.
-            IRValue expr_val = get_ir_value_stack(builder);
-            if (expr_val.value_kind == IRVAL_ERR) {
-                fprintf(stderr, "No value found in val_stack in exit node.");
-                break;
+            // TODO: UGHHHHH HHH probably check if it's 'return;' or 'ret x;' or whatever.
+            if (node->node_info.exit_info.expr != NULL) {
+                // Pop the value we need from the value stack.
+                IRValue expr_val = get_ir_value_stack(builder);
+                if (expr_val.value_kind == IRVAL_ERR) {
+                    fprintf(stderr, "No value found in val_stack in exit node.");
+                    break;
+                }
+
+                emit_halt_with_val(builder, node, expr_val);
+            }
+            else { // NULL == 'return;'
+                emit_halt_no_val(builder, node);
             }
 
-            emit_halt(builder, node, expr_val);
             break;
         }
 
@@ -1053,12 +1103,18 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, IRFu
         {
             // TODO: Rename halt to 'ret'. Halt is just bad naming.
             Halt halt = instr->payload.halt_payload;
-            if (halt.code.value_kind == IRVAL_IMM) {
-                fprintf(output, "ret %lld", halt.code.value_id.imm);
+            if (halt.has_value) {
+                if (halt.code.value_kind == IRVAL_IMM) {
+                    fprintf(output, "ret %lld", halt.code.value_id.imm);
+                }
+                else if (halt.code.value_kind == IRVAL_TEMP) {
+                    fprintf(output, "ret t%zu", halt.code.value_id.temp_id.id);
+                }
             }
-            else if (halt.code.value_kind == IRVAL_TEMP) {
-                fprintf(output, "ret t%zu", halt.code.value_id.temp_id.id);
+            else {
+                fprintf(output, "ret");
             }
+
             break;
         }
         case IR_BRANCH_IF_ZERO:
@@ -1095,7 +1151,8 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, IRFu
             Call call = instr->payload.call_pl;
             fprintf(output, "call t%zu, ", call.dst.id);
             print_function_name(builder, call.fn_sym_id, output);
-            fprintf(output, ", ");
+            if (call.args.count != 0)
+                fprintf(output, ", ");
             for (int i = 0; i < call.args.count; i++) {
                 IRValue val = VEC_AT_T(&call.args, IRValue, i);
                 if (val.value_kind == IRVAL_IMM) {
@@ -1111,7 +1168,7 @@ void print_instruction(IRBuilder* builder, IRInstruct* instr, FILE* output, IRFu
         }
         case IR_UNDEFINED:
         {
-            fprintf(output, "ERROR: Op not created/found (likely missing terminator).");
+            fprintf(output, "ERROR: Op not created/found (missing terminator? void function?).");
             break;
         }
         

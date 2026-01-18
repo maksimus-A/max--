@@ -200,8 +200,8 @@ int starts_stmt(Parser* parser) {
         case RETURN:
             return 1;
             break;
-        case IDENTIFIER: // assignment statement
-            if (next(parser).token_kind == EQ) return 1;
+        case IDENTIFIER: // assignment statement (NEW: OR FUNCTION CALL!)
+            if (next(parser).token_kind == EQ || next(parser).token_kind == PAREN_START) return 1;
             break;
         default:
             return 0;
@@ -580,8 +580,11 @@ ASTNode* parse_return(Parser* parser, Source* source_file) {
     exit_node->id = parser->curr_id;
     parser->curr_id++;
     // TODO: Get span of the entire function (usually up to ;)
-    // we already verified the next token is '('.
     advance(parser);
+    if (current(parser).token_kind == SEMICOLON) {
+        advance(parser);
+        return exit_node;
+    }
 
     ASTNode* expr = parse_expr(parser, source_file, 0);
     if (expr->ast_kind == AST_ERROR) return NULL; // todo: error handle better.
@@ -898,13 +901,20 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
                     break;
             }
         }
-        else if (starts_stmt(parser)) {  // Currently supports: assignments, returns, if, while.
+        else if (starts_stmt(parser)) {  // Currently supports: assignments, returns, if, while, fn calls
             switch (current(parser).token_kind) {
                 case IDENTIFIER:
                 {
                     if (next(parser).token_kind == EQ) {
                         ASTNode* assn = parse_assn(parser, source_file);
                         push_node(parser, list, assn);
+                    }
+                    // TODO: Consider NOT checking paren_start and arbitrarily parsing an expr instead? idk.
+                    else if (next(parser).token_kind == PAREN_START) {
+                        // blah blah
+                        ASTNode* expr = parse_expr(parser, source_file, 0);
+                        push_node(parser, list, expr);
+                        expect_token(parser, SEMICOLON);
                     }
                     break;
                 }
