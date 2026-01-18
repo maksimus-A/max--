@@ -59,21 +59,21 @@ void visit_block_end(void* user, IRBlock* block, IRFunction* f) {
         {
             if (block->succs.count != 0)
                 add_diag_mir(verifier->ir_diags, ERROR, 
-                    "Block %zu is terminated with HALT but has %zu successors (should be %zu)", block->id.id, block->succs.count, 0);
+                    "Block %zu_%zu is terminated with RET but has %zu successors (should be %zu)", f->id.id, block->id.id, block->succs.count, 0);
             break;
         }
         case IR_JUMP:
         {
             if (block->succs.count != 1)
                 add_diag_mir(verifier->ir_diags, ERROR, 
-                    "Block %zu is terminated with JUMP but has %zu successors (should be %zu)", block->id.id, block->succs.count, 1);
+                    "Block %zu_%zu is terminated with JUMP but has %zu successors (should be %zu)", f->id.id, block->id.id, block->succs.count, 1);
             break;
         }
         case IR_BRANCH_IF_ZERO:
         {
             if (block->succs.count != 2)
                 add_diag_mir(verifier->ir_diags, ERROR, 
-                    "Block %zu is terminated with BRANCH but has %zu successors (should be %zu)", block->id.id, block->succs.count, 2);
+                    "Block %zu_%zu is terminated with BRANCH but has %zu successors (should be %zu)", f->id.id, block->id.id, block->succs.count, 2);
             break;
         }
         default: add_diag_mir(verifier->ir_diags, ERROR, "Terminator instruction is not actually a terminator.");
@@ -137,7 +137,7 @@ void visit_instruct(void* user, IRInstruct* inst, IRFunction* f, IRBlock* b, siz
                     }
                 }
                 else {
-                    add_diag_mir(verifier->ir_diags, ERROR,"At instruction %zu: Accessing invalid temp t%zu", inst_index, val);
+                    add_diag_mir(verifier->ir_diags, ERROR,"(Store) At instruction %zu: Accessing invalid temp t%zu", inst_index, val);
                 }
             }
             // store operation types match
@@ -146,6 +146,42 @@ void visit_instruct(void* user, IRInstruct* inst, IRFunction* f, IRBlock* b, siz
             // Store operand kinds are valid (no storing to temp)
             // My prev pass literally doesn't allow this because 'dst' is stored
             // as a SlotId, which cannot be a TempId.
+            break;
+        }
+        case IR_ARG:
+        {
+            Arg arg = inst->payload.arg_pl;
+
+            // Ensure temp wasn't previously defined.
+            // todo: verify that unset vectors would actully return NULL.
+            define_temp(verifier, arg.dst, inst, inst_index);
+            break;
+        }
+        case IR_CALL:
+        {
+            Call call = inst->payload.call_pl;
+
+            define_temp(verifier, call.dst, inst, inst_index);
+
+            for (int i = 0; i < call.args.count; i++) {
+                IRValue arg = VEC_AT_T(&call.args, IRValue, i);
+
+                if (arg.value_kind == IRVAL_TEMP) {
+                    size_t val = arg.value_id.temp_id.id;
+                    if (val < verifier->temp_cap) {
+                        if (verifier->temp_def[val] == NULL) {
+                            // todo: show which instruction it was prev defined at.
+                            // you can use the outer for-loop, it 'gets nth instr'
+                            add_diag_mir(verifier->ir_diags, ERROR,"(Call) At instruction %zu: Temp t%zu has not been declared.", inst_index, arg.value_id.temp_id.id);
+                        }
+                    }
+                    else {
+                        add_diag_mir(verifier->ir_diags, ERROR,"(Call) At instruction %zu: Accessing invalid temp t%zu", inst_index, val);
+                    }
+                }
+            }
+
+
             break;
         }
         case IR_HALT:

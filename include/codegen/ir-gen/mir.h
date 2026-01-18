@@ -198,7 +198,10 @@ typedef struct IRFunction {
     // Function Symbol ID.
     size_t fn_sym_id;
     // Function return type.
-    BuiltInType ret_type; // todo unused
+    BuiltInType ret_type;
+    size_t param_count;
+    BuiltInType* param_types;
+
 } IRFunction;
 
 typedef struct IRBuilder {

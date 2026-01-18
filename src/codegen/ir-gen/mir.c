@@ -96,8 +96,8 @@ IRInstruct* get_nth_instruction(IRBlock* block, int i) {
     return VEC_AT_PTR_T(&block->instructions, IRInstruct, i);
 }
 
-static void add_successor(IRBuilder* builder, IRFunction* f, BlockId succ) {
-    VEC_PUSH_T(&get_curr_block(builder, f)->succs, succ);
+static void add_successor(IRBuilder* builder, IRBlock* b, BlockId succ) {
+    VEC_PUSH_T(&b->succs, succ);
 }
 
 
@@ -524,7 +524,7 @@ BlockId block_init_in_func(IRBuilder* b, IRFunction* f) {
 
 // Initializes an IRFunction, including an entry block,
 // and inserts it into builder.
-void begin_function(IRBuilder* builder, size_t fn_sym_id, BuiltInType ret_type) {
+void begin_function(IRBuilder* builder, FnDeclInfo fndec) {
 
     IRFunction func = {0};
     // Create blocks vector
@@ -544,11 +544,16 @@ void begin_function(IRBuilder* builder, size_t fn_sym_id, BuiltInType ret_type) 
     ptr_table_init(&func.slot_sym, builder->arena);
     ptr_table_init(&func.sym_slot, builder->arena);
 
+    // Set fn signature stuff.
+
     // Set function symbol ID
-    func.fn_sym_id = fn_sym_id;
+    func.fn_sym_id = fndec.sym->id;
 
     //Set function return type
-    func.ret_type = ret_type;
+    func.ret_type = fndec.ret_type;
+    // Param count
+    func.param_count = fndec.params.count;
+    func.param_types = fndec.sym->fn_info.sig.param_types; // stable arena pointer.
 
     // push function into builder
     VEC_PUSH_T(&builder->funcs, func);
@@ -571,7 +576,7 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
         }
         case AST_FN_DEC: {
             // Create function (this sets new curr_func, inserts into builder, creates entry block, etc)
-            begin_function(builder, node->node_info.fn_dec.sym->id, node->node_info.fn_dec.ret_type);
+            begin_function(builder, node->node_info.fn_dec);
             IRFunction* f = get_curr_func(builder);
             // Emit 'arg' ops for all args per function.
             const Symbol* fn_sym = node->node_info.fn_dec.sym;
@@ -604,6 +609,11 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
         }
         case AST_IF:
         {
+            // TODO: Maybe a smarter idea for terminator successors is
+            // after block generation, just always check the terminator
+            // and add successors based on the terminator. Saves headache later.
+            // But for now they can be saved here.
+
             // First compute condition into a temp (and emit cmp op)
             IRValue cond_val = lower_expr(builder, node->node_info.if_stmt.cond);
 
@@ -633,9 +643,6 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
 
             // Emit branch op in current block.
             emit_branch_if_zero(builder, node, cond_val, then_block_id, nonzero_block_id);
-            // Current block's successors.
-            add_successor(builder, f, then_block_id);
-            add_successor(builder, f, nonzero_block_id);
 
             // Now we must process statements per-new block that exists.
 
@@ -646,8 +653,7 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
             if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
                 emit_jump(builder, node, join_block_id);
             }
-            // Then block successor.
-            add_successor(builder, f, join_block_id);
+
 
             // Else block termination
             if (else_node != NULL) {
@@ -657,8 +663,6 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
                     // If no terminator, insert a jump to 'join'.
                     emit_jump(builder, node, join_block_id);
                 }
-                // Else block successor.
-                add_successor(builder, f, join_block_id);
             }
 
             // My understanding is if I set the curr_block to join_block,
@@ -685,7 +689,6 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
             if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
                 emit_jump(builder, node, header_block_id);
             }
-            add_successor(builder, f, header_block_id);
 
             // Set current block to header
             builder->curr_block_index = header_block_id.id;
@@ -695,9 +698,7 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
             if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
                 emit_branch_if_zero(builder, node, cond_val, loop_block_id, join_block_id);
             }
-            // Add successors to header block
-            add_successor(builder, f, loop_block_id);
-            add_successor(builder, f, join_block_id);
+
 
             // Set current block to loop_body
             builder->curr_block_index = loop_block_id.id;
@@ -707,8 +708,6 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
             if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
                 emit_jump(builder, node, header_block_id);
             }
-            // Add successor to loop body
-            add_successor(builder, f, header_block_id);
 
             // Set current block to join
             builder->curr_block_index = join_block_id.id;
@@ -937,9 +936,46 @@ static void lower_stmt(IRBuilder* builder, ASTNode* stmt) {
     assert(builder->val_stack.count == stack_size);
 }
 
-// Main call function.
+//* A second pass that quickly creates a CFG based on the block structure.
+void add_all_successors(IRBuilder* builder) {
+
+    size_t block_index = 0;
+    for (int i = 0; i < builder->funcs.count; i++) {
+        IRFunction* f = get_nth_func(&builder->funcs, i);
+
+        for (int j = 0; j < f->blocks.count; j++) {
+            IRBlock* b = get_nth_block(f, j);
+
+            IRInstruct inst = b->term;
+            switch (inst.type) {
+                case IR_JUMP:
+                {
+                    add_successor(builder, b, inst.payload.jump_pl.jump_to);
+                    break;
+                }
+                case IR_HALT:
+                {
+                    // None.
+                    break;
+                }
+                case IR_BRANCH_IF_ZERO:
+                {
+                    add_successor(builder, b, inst.payload.br_pl.non_zero);
+                    add_successor(builder, b, inst.payload.br_pl.zero);
+                    break;
+                }
+                default: break;
+            }
+        }
+    }
+}
+
+//* Main call function. */ 
 void run_mir_gen(ASTNode* ast_root, IRBuilder* builder) {
     walk_node(&mir_gen_visitor, builder, ast_root);
+
+    // Build CFG from MIR.
+    add_all_successors(builder);
 }
 
 void builder_init(IRBuilder* builder, Arena* arena, Diagnostics* diags, Semantics* sema, Source* source_file) {
