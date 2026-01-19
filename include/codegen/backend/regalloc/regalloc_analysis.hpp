@@ -42,14 +42,19 @@ struct Location {
 // Created per-function.
 struct RegAllocInfo {
 
-    explicit RegAllocInfo(std::size_t num_pregs, std::size_t max_slots, std::size_t num_vregs)
+    explicit RegAllocInfo(std::size_t num_pregs, std::size_t num_callee_regs, std::size_t max_slots, std::size_t num_vregs)
         : slot_counter(max_slots+1) {
             free_regs = BitSet(num_pregs);
+            free_callee_regs = BitSet(num_callee_regs);
             locs.resize(num_vregs, Location());
         }
 
     // free pregs while scanning
-    BitSet free_regs;
+    BitSet free_regs; // x9 - x15
+    BitSet free_callee_regs; // x19 - x28
+
+    std::vector<int> used_callee_regs; // ?? unused
+
     // Active intervals during scan, sorted by end ascending
     std::vector<Range*> active;
     // New slots to assign if spill

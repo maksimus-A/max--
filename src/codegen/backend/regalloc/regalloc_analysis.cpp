@@ -9,6 +9,9 @@
 #include <unordered_map>
 #include <unordered_set>
 
+constexpr size_t CALLER_SAVED_BASE = 9;
+constexpr size_t CALLEE_SAVED_BASE = 19;
+
 
 struct RegAllocAnalysis: LIRVisitor {
 public:
@@ -43,7 +46,14 @@ public:
         print_live_intervals();
     }
 
+    // Range construction
     void visit_inst(const LIRInstruct& inst) override {
+
+        // Add call instructions to list
+        if (alt<LIRCall>(inst.pl)) {
+            call_insts.push_back(inst.inst_num);
+        }
+
         // Range = [start, end)
         for (auto& d: defs(inst)) {
             // Check if vreg 'd' is in live set
@@ -68,11 +78,13 @@ public:
     // Need to sort per interval too.
     // it's a minimal change; each interval has associated vreg,
     // so just unpack 'Intervals' if you want to change it.
+
+    //* Main entry point for linear scan regalloc.
     void linear_scan_regalloc() {
         for (auto& f: ctx.lir_funcs) {
             curr_info = &ctx.liveness[f.id.id];
             std::vector<Interval>& unhandled = curr_info->intervals;
-            RegAllocInfo regalloc = RegAllocInfo(ARM_FREE_REGS, f.max_slot_id, f.next_vreg);
+            RegAllocInfo regalloc = RegAllocInfo(ARM_FREE_REGS, ARM_FREE_CALLEE_REGS, f.max_slot_id, f.next_vreg);
 
             // Sort the intervals by their start of first range.
             std::sort(unhandled.begin(), unhandled.end(),
@@ -115,7 +127,7 @@ public:
         for (int i = 0; i < regalloc.locs.size(); i++) {
             const Location& loc = regalloc.locs[i];
             if (loc.kind == LOC_PREG) {
-                out << "v" << i << ": p" << loc.id << std::endl;
+                out << "v" << i << ": x" << loc.id << std::endl;
             }
             else if (loc.kind == LOC_SLOT) {
                 out << "v" << i << ": slot(" << loc.id << ")" << std::endl;
@@ -344,6 +356,15 @@ private:
 
     RegAllocInfo* regalloc;
 
+    // Call instruction locations (for checking intersection with ranges)m
+    std::vector<size_t> call_insts;
+
+    // Map bitset index 0 -> x9, 1 -> x10, etc.
+    const std::vector<size_t> CALLER_SAVED_IDS = {9, 10, 11, 12, 13, 14, 15};
+
+    // Map bitset index 0 -> x19, 1 -> x20, etc.
+    const std::vector<size_t> CALLEE_SAVED_IDS = {19, 20, 21, 22, 23, 24, 25, 26, 27, 28};
+
     static inline void maybe_push_vreg(std::vector<VRegId>& out, const Reg& r) {
         if (alt<VRegId>(r.id)) out.push_back(get<VRegId>(r.id));
     }
@@ -361,6 +382,8 @@ private:
             [&](const LIRConst& cons) { maybe_push_vreg(defined, cons.dst); },
             [&](const LIRBinOp& binop){ maybe_push_vreg(defined, binop.dst); },
             [&](const LIRSetCC& setcc){ maybe_push_vreg(defined, setcc.dst); },
+            [&](const LIRArgGet& arg_get) {maybe_push_vreg(defined, arg_get.dst);},
+            [&](const LIRCall& call) {maybe_push_vreg(defined, call.dst);},
             [&](auto const&) { /* none */ }
         }, inst.pl);
 
@@ -387,6 +410,7 @@ private:
                 maybe_push_vreg(used, setcc.rhs);
             },
             [&](const LIRBranch& br){ maybe_push_vreg(used, br.cmp); },
+            [&](const LIRArgPut& arg_put) {maybe_push_vreg(used, arg_put.src);}, 
             [&](auto const&) { /* none */ }
         }, inst.pl);
 
@@ -443,7 +467,7 @@ private:
     }
 
     // LINEAR SCAN REGISTER ALLOCATION PASS
-       void sort_active_by_end(std::vector<Range*>& active) {
+    void sort_active_by_end(std::vector<Range*>& active) {
         std::sort(active.begin(), active.end(),
         [](const Range* a, const Range* b)
                 { return a->end < b->end; });
@@ -457,7 +481,12 @@ private:
                 if (preg_loc.kind == LOC_SLOT) continue;
 
                 std::size_t preg = preg_loc.id;
-                regalloc.free_regs.clear(preg);
+
+                if (preg_loc.id >= CALLEE_SAVED_BASE) {
+                    regalloc.free_callee_regs.clear(preg_loc.id - CALLEE_SAVED_BASE);
+                } else {
+                    regalloc.free_regs.clear(preg_loc.id - CALLER_SAVED_BASE);
+                }
 
                 // Remove this range from 'active' ranges.
                 it = regalloc.active.erase(it);
@@ -477,19 +506,61 @@ private:
         return true;
     }
 
-    void allocate_preg(RegAllocInfo& regalloc, Range* r) {
-        int free_reg = regalloc.free_regs.get_first_zero_position();
-        if (free_reg == -1) {
-            // TODO: Add diagnostic error
-            out << "Preg was supposed to have available slot but none found.";
-            return;
+    // Check if given ranges crosses any function calls in the current live set.
+    bool check_if_crosses_call(Range* r) {
+        // todo: optimize?
+        for (auto& inst_num: call_insts) {
+            if (r->start < inst_num && inst_num < r->end) return true;
         }
+        return false;
+    }
 
-        // Set location of vreg/preg
-        r->assigned_preg.id = (size_t)free_reg;
-        regalloc.locs[r->vreg.id] = Location(LOC_PREG, r->assigned_preg.id);
-        // Set preg to 'used'
-        regalloc.free_regs.set((size_t)free_reg);
+    void allocate_preg(RegAllocInfo& regalloc, Range* r) {
+        bool crosses_call = check_if_crosses_call(r);
+
+        if (crosses_call) { // use callee saved regs.
+            int idx = regalloc.free_callee_regs.get_first_zero_position();
+            
+            if (idx == -1 || idx >= CALLEE_SAVED_IDS.size()) {
+                allocate_slot(regalloc, r); // Spill if full
+                return;
+            }
+
+            // Save reg into used_callee_regs
+            size_t real_reg_id = CALLEE_SAVED_IDS[idx];
+
+            // Check if reg already exists in the used vector
+            bool already_tracked = false;
+            for (size_t u : regalloc.used_callee_regs) {
+                if (u == real_reg_id) {
+                    already_tracked = true;
+                    break;
+                }
+            }
+            if (!already_tracked) {
+                regalloc.used_callee_regs.push_back(real_reg_id);
+            }
+
+            // Save to 'free_callee_regs'
+            r->assigned_preg.id = real_reg_id;
+            regalloc.locs[r->vreg.id] = Location(LOC_PREG, real_reg_id);
+            regalloc.free_callee_regs.set((size_t)idx);
+        }
+        else { // We can use caller clobber regs.
+            int idx = regalloc.free_regs.get_first_zero_position();
+            if (idx == -1) {
+                // TODO: Add diagnostic error
+                out << "Preg was supposed to have available slot but none found (clobber).";
+                return;
+            }
+
+            // Set location of vreg/preg
+            size_t real_reg_id = CALLER_SAVED_IDS[idx];
+            r->assigned_preg.id = real_reg_id;
+            regalloc.locs[r->vreg.id] = Location(LOC_PREG, real_reg_id);
+            // Set preg to 'used'
+            regalloc.free_regs.set((size_t)idx);
+        }
     }
 
     void allocate_slot(RegAllocInfo& regalloc, Range* r) {

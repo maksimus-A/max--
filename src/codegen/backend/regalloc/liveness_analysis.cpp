@@ -93,14 +93,15 @@ public:
     void visit(const LIRJump& jump) {
         // No uses or definitions here.
     }
+    // Function stuff
     void visit(const LIRArgGet& arg_get) {
-        
+        note_def(get_vreg(arg_get.dst));
     }
     void visit(const LIRArgPut& arg_put) {
-        
+        note_use(get_vreg(arg_put.src)); 
     }
     void visit(const LIRCall& call) {
-        
+        note_def(get_vreg(call.dst));
     }
 
     /*----- IN/OUT PHASE: ------*/
