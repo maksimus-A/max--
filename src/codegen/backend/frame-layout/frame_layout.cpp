@@ -26,7 +26,7 @@ void define_frame_layout_of_slots() {
 
             // Start Depth at 16 (Reserved for FP/LR)
             //    [FP+0] = Old FP, [FP+8] = LR
-            size_t current_depth = 16; 
+            size_t current_depth = 0;
             
             // --- CALLEE SAVED REGISTERS ---
             std::vector<int>& used_callee_regs = ctx.fn_used_callee_regs[f.id.id];
@@ -88,7 +88,7 @@ void define_frame_layout_of_slots() {
             size_t frame_record_size = 16;
             
             // Total frame size must be 16-byte aligned for SP
-            size_t total_frame_size = align_up(current_depth, 16);
+            size_t total_frame_size = align_up(16 + current_depth, 16);
 
             // Construct FrameInfo
             FrameInfo frame = FrameInfo(

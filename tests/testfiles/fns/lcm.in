@@ -1,0 +1,59 @@
+// Calculate Greatest Common Divisor (Recursive)
+// Uses Euclidean algorithm: gcd(a, b) = gcd(b, a % b)
+fn gcd(int a, int b): int {
+    if (b == 0) {
+        return a;
+    }
+    
+    // Since we don't have %, we implement manual modulo
+    // a % b = a - ((a / b) * b)
+    int div = a / b;
+    int rem = a - (div * b);
+    
+    return gcd(b, rem);
+}
+
+// Calculate Least Common Multiple
+// formula: (a * b) / gcd(a, b)
+fn lcm(int a, int b): int {
+    if (a == 0) { return 0; }
+    if (b == 0) { return 0; }
+    
+    // Note: We compute gcd first. 
+    // This forces the compiler to keep 'a' and 'b' alive 
+    // across the call to gcd so we can use them for the multiply after.
+    int div = gcd(a, b);
+    
+    // We multiply first, then divide by the GCD
+    int prod = a * b;
+    return prod / div;
+}
+
+fn main(): int {
+    int n = 12; // We will calculate LCM(1, 2, ... 12)
+    
+    int i = 1;
+    int running_lcm = 1;
+
+    while (i < (n + 1)) {
+        // running_lcm is passed in, and overwritten by the return value.
+        // It acts as an accumulator that survives many function calls.
+        running_lcm = lcm(running_lcm, i);
+        
+        i = i + 1;
+    }
+
+    // LCM of 1..10 is 2520
+    // LCM of 1..12 is 27720
+    int z = while_test();
+    //return running_lcm; 
+    return z;
+}
+
+fn while_test(): int {
+    int i = 0;
+    while (i < 5) {
+        i = i + 1;
+        if (i == 4) {return i;}
+    }
+}

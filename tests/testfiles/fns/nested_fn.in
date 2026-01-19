@@ -7,5 +7,5 @@ fn main(): int {
     // one() is called AGAIN. Result stored in vB.
     // CRITICAL: vA must sit around waiting for the second one() to finish.
     int z = add(one(), one()); 
-    return z;
+    return z; // 2
 }

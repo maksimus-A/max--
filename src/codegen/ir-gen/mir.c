@@ -609,67 +609,69 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
         }
         case AST_IF:
         {
-            // TODO: Maybe a smarter idea for terminator successors is
-            // after block generation, just always check the terminator
-            // and add successors based on the terminator. Saves headache later.
-            // But for now they can be saved here.
-
             // First compute condition into a temp (and emit cmp op)
             IRValue cond_val = lower_expr(builder, node->node_info.if_stmt.cond);
-
-            // Now create branch op.
 
             IRFunction* f = get_curr_func(builder);
 
             // Create then, else, join blocks
-
             BlockId then_block_id = block_init(builder);
-            size_t then_idx = then_block_id.id;
-
+            
             BlockId else_block_id;
-            size_t else_idx = SIZE_MAX;
             // Check if else-node exists
             ASTNode* else_node = node->node_info.if_stmt.else_block;
             if (else_node) {
                 else_block_id = block_init(builder);
-                else_idx = else_block_id.id;
             }
 
             BlockId join_block_id = block_init(builder);
-            size_t join_idx = join_block_id.id;
-
+            
             // Fetch BlockId's for branch op
             BlockId nonzero_block_id = else_node == NULL ? join_block_id : else_block_id;
 
             // Emit branch op in current block.
             emit_branch_if_zero(builder, node, cond_val, then_block_id, nonzero_block_id);
 
-            // Now we must process statements per-new block that exists.
+            // Track if execution flow merges into the join block
+            bool flow_reaches_join = false;
 
-            // Then block termination
+            // --- Then block ---
             builder->curr_block_index = then_block_id.id;
             lower_stmt(builder, node->node_info.if_stmt.then_block);
             // If no terminator, insert a jump to 'join'.
             if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
                 emit_jump(builder, node, join_block_id);
+                flow_reaches_join = true;
             }
 
-
-            // Else block termination
+            // --- Else block ---
             if (else_node != NULL) {
                 builder->curr_block_index = else_block_id.id;
                 lower_stmt(builder, node->node_info.if_stmt.else_block);
                 if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
-                    // If no terminator, insert a jump to 'join'.
                     emit_jump(builder, node, join_block_id);
+                    flow_reaches_join = true;
                 }
+            } else {
+                // No else block implies the 'false' condition of the branch 
+                // falls through directly to the join block.
+                flow_reaches_join = true;
             }
 
-            // My understanding is if I set the curr_block to join_block,
-            // The over-arching walker of the entire AST from 'Program' will take back over,
-            // and insert instructions into the proper block here.
-            // So i think this is all.
+            // Set current block to join for subsequent statements
             builder->curr_block_index = join_block_id.id;
+
+            // FIX: If the join block is unreachable (because both branches returned),
+            // we must terminate it to satisfy IR verification, even though it's dead code.
+            if (!flow_reaches_join) {
+                if (f->ret_type == TYPE_VOID) {
+                    emit_halt_no_val(builder, node);
+                } else {
+                    // Emit a dummy 0 for non-void functions
+                    IRValue dummy = {.value_kind = IRVAL_IMM, .value_id.imm = 0};
+                    emit_halt_with_val(builder, node, dummy);
+                }
+            }
 
             return SKIP_CHILDREN;
             break;
@@ -738,11 +740,24 @@ void mir_gen_post(void* user, ASTNode* node) {
             // implciitly add one.
             IRFunction* f = get_curr_func(builder);
             IRBlock* b = get_curr_block(builder, f);
-            if (!b->has_term && f->ret_type == TYPE_VOID) {
-                // Insert implicit return
-                emit_halt_no_val(builder, node);
+            // Check if the last block (where execution flow ended) has a terminator.
+            if (!b->has_term) {
+                if (f->ret_type == TYPE_VOID) {
+                    // Implicit return for void functions
+                    emit_halt_no_val(builder, node);
+                } else {
+                    // Control reaches end of non-void function.
+                    // To satisfy the IR verifier, we MUST emit a terminator.
+                    // In C, this is Undefined Behavior. Here, we can just return 0 
+                    // or emit a specific "Trap/Unreachable" opcode if you have one.
+                    
+                    IRValue zero_val = {.value_kind = IRVAL_IMM, .value_id.imm = 0};
+                    emit_halt_with_val(builder, node, zero_val);
+                    
+                    // Optional: You could emit a compiler warning here.
+                    // fprintf(stderr, "Warning: Control reaches end of non-void function '%s'\n", ...);
+                }
             }
-
             break;
         }
         case AST_FN_CALL:
@@ -885,7 +900,6 @@ void mir_gen_post(void* user, ASTNode* node) {
         }
         case AST_EXIT:
         {
-            // TODO: UGHHHHH HHH probably check if it's 'return;' or 'ret x;' or whatever.
             if (node->node_info.exit_info.expr != NULL) {
                 // Pop the value we need from the value stack.
                 IRValue expr_val = get_ir_value_stack(builder);

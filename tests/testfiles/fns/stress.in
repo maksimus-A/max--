@@ -1,0 +1,78 @@
+fn inc(int x): int { return x + 1; }
+fn dec(int x): int { return x - 1; }
+
+fn clamp01(int x): int {
+    if (x < 0) { return 0; }
+    else {
+        if (x > 1) { return 1; }
+        else { return x; }
+    }
+}
+
+fn weird_rec(int n): int {
+    // Lots of early exits to stress CFG
+    if (n < 1) { return 0; }
+    if (n == 1) { return 1; }
+
+    // Nested if/else with returns
+    if (n == 7) {
+        { return 70; }
+    } else {
+        { /* fallthrough */ }
+    }
+
+    // Recursion with some arithmetic and another call
+    int a = weird_rec(n - 1);
+    int b = clamp01(n - 2);
+    return a + b + n;
+}
+
+fn loop_mess(int n): int {
+    int i = 0;
+    int acc = 0;
+
+    while (i < n) {
+        {
+            // Early return in loop body (tests that no join/latch edges remain)
+            if (i == 3) {
+                {
+                    if (n == 10) { return acc + 1000; }
+                    else { return acc + 2000; }
+                }
+            } else {
+                { /* continue normal path */ }
+            }
+
+            // Nested if that sometimes returns, sometimes not
+            if ((i + n) == 9) {
+                { return acc + 3000; }
+            } else {
+                { /* no return */ }
+            }
+
+            // Call inside loop, value live across call
+            int t = weird_rec(i + 2);
+            acc = acc + t;
+
+            int half = acc / 2;
+            int even = acc - (half * 2); // 0 if even, 1 if odd for non-negative acc
+            if (even == 0) { { } } else { { return acc + 4000; } }
+        }
+
+        i = i + 1;
+    }
+
+    return acc;
+}
+
+fn main(): int {
+    int n = 10;
+    int a = loop_mess(n);
+
+    // Both branches return (tests your “join block only if needed” logic)
+    if (a > 5000) {
+        { return a; }
+    } else {
+        { return a + 1; }
+    }
+}

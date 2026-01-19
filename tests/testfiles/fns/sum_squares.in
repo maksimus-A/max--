@@ -1,0 +1,34 @@
+fn square(int x): int {
+    return x * x;
+}
+
+fn sum_of_squares_up_to(int n): int {
+    int i = 1;
+    int acc = 0;
+
+    while (i < n+1) {
+        {
+            int s = square(i);
+            acc = acc + s;
+        }
+
+        i = i + 1;
+    }
+
+    return acc;
+}
+
+fn main(): int {
+    int n = 10;
+    int result = sum_of_squares_up_to(n);
+
+    if (result > 50) {
+        {
+            return result;
+        }
+    } else {
+        {
+            return 0;
+        }
+    }
+}
