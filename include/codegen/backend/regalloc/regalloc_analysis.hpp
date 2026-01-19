@@ -48,12 +48,12 @@ struct RegAllocInfo {
             free_callee_regs = BitSet(num_callee_regs);
             locs.resize(num_vregs, Location());
         }
+    
+    std::vector<int> used_callee_regs;
 
     // free pregs while scanning
     BitSet free_regs; // x9 - x15
     BitSet free_callee_regs; // x19 - x28
-
-    std::vector<int> used_callee_regs; // ?? unused
 
     // Active intervals during scan, sorted by end ascending
     std::vector<Range*> active;

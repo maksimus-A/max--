@@ -81,6 +81,9 @@ public:
 
     //* Main entry point for linear scan regalloc.
     void linear_scan_regalloc() {
+        // Resize callee regs to # of functions
+        ctx.fn_used_callee_regs.resize(ctx.lir_funcs.size());
+        
         for (auto& f: ctx.lir_funcs) {
             curr_info = &ctx.liveness[f.id.id];
             std::vector<Interval>& unhandled = curr_info->intervals;
@@ -119,11 +122,19 @@ public:
             // and fill the table for new slots. then frame layout can use that
             // new SlotDesc as the source of truth.
             f.max_slot_id = regalloc.slot_counter;
-            if (debug) print_preg_allocations(regalloc);
+
+            // Set used_callee_regs in ctx
+            ctx.fn_used_callee_regs[f.id.id] = regalloc.used_callee_regs;
+
+            if (debug) print_preg_allocations(regalloc, f);
         }
     }
 
-    void print_preg_allocations(const RegAllocInfo& regalloc) {
+    void print_preg_allocations(const RegAllocInfo& regalloc, const LIRFunction& f) {
+        // Print fn name
+        ctx.print_symbol_name(f.fn_sym_id, out);
+        out << ":\n";
+
         for (int i = 0; i < regalloc.locs.size(); i++) {
             const Location& loc = regalloc.locs[i];
             if (loc.kind == LOC_PREG) {
@@ -133,6 +144,7 @@ public:
                 out << "v" << i << ": slot(" << loc.id << ")" << std::endl;
             }
         }
+        out << "\n";
     }
 
     /*------ ADDING SPILLED VREG TO INST PASS ------*/

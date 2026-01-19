@@ -49,7 +49,10 @@ public:
     // Location info mapping vreg -> (preg|slot).
     std::vector<std::vector<Location>> locs;
     std::vector<std::optional<FrameInfo>> frame_info;
-    std::vector<TableView<Symbol>> slot_syms; // unused?
+    std::vector<TableView<Symbol>> slot_syms;
+    // Maps FuncId -> used_callee_regs vector
+    // Set after regalloc (used inside Regalloc struct)
+    std::vector<std::vector<int>> fn_used_callee_regs;
 
     // Returns the vector of MIR functions.
     VecView<IRFunction> mir_functions() { return VecView<IRFunction>(mod.funcs); }
