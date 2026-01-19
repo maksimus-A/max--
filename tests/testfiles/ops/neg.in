@@ -1,0 +1,6 @@
+fn main(): int {
+    int x = -1;
+    int y = x + 3 - (-3);
+
+    return y;
+}

@@ -55,10 +55,13 @@ static enum TokenKind get_keyword(char* buf, int i, int length) {
         case 2:
             if (memcmp(p, "if", 2) == 0) token_kind = IF;
             else if (memcmp(p, "fn", 2) == 0) token_kind = FN;
+            else if (memcmp(p, "or", 2) == 0) token_kind = OR;
             break;
 
         case 3:
             if (memcmp(p, "int", 3) == 0) token_kind = INT;
+            else if (memcmp(p, "not", 3) == 0) token_kind = NOT;
+            else if (memcmp(p, "and", 3) == 0) token_kind = AND;
             break;
 
         case 4:
@@ -185,7 +188,6 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
             // Simple delimiters
             case '=':
                 {
-                    // TODO: Consider '==' as well.
                     if (i + 1 < source_file->length) {
                         if (source_file->buffer[i+1] == '=') {
                             Token token = set_token(EQQ, i, line, col, 2);
@@ -286,6 +288,11 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                             Token token = set_token(NEQ, i, line, col, 2);
                             push_token(tokens, token);
                             i++;
+                        }
+                        else {
+                            // Unary 'not' op
+                            Token token = set_token(NOT, i, line, col, 1);
+                            push_token(tokens, token);
                         }
                     }
                 }

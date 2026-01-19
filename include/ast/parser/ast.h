@@ -17,6 +17,7 @@ typedef enum ASTKind {
     AST_EXIT,
     AST_BIN_OP, // binary operators
     AST_CMP_OP,
+    AST_UNARY_OP,
     // Control flow stuff
     AST_COND,
     AST_IF,
@@ -24,8 +25,6 @@ typedef enum ASTKind {
     // Function stuff
     AST_FN_DEC,
     AST_FN_CALL,
-    AST_THEN, // todo: unused?
-    AST_ELSE, // todo: unused?
     AST_ERROR
 } ASTKind;
 
@@ -98,6 +97,12 @@ typedef struct BinaryOperatorInfo {
     ASTNode* RHS;
 }BinOpInfo;
 
+// Unary op
+typedef struct UnaryOperatorInfo {
+    Token op;
+    ASTNode* expr;
+} UnOpInfo;
+
 typedef struct IfStmtInfo {
     ASTNode* cond;
     ASTNode* then_block;
@@ -157,6 +162,7 @@ typedef struct ASTNode {
         ExitInfo exit_info; // return info really.
         AssnStmtInfo assn_stmt;
         BinOpInfo bin_op; // also for cmpop
+        UnOpInfo un_op;
         IfStmtInfo if_stmt;
         WhileStmtInfo while_stmt;
         FnDeclInfo fn_dec;

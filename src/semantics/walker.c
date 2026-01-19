@@ -143,6 +143,14 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
             }
             break;
         }
+        case AST_UNARY_OP:
+        {
+            ASTNode* expr = node->node_info.un_op.expr;
+            if (expr && walk_children == WALK_CHILDREN) {
+                walk_node(visitor, user, expr);
+            }
+            break;
+        }
         case AST_BIN_OP:
         case AST_CMP_OP:
         {

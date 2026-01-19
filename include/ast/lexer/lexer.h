@@ -6,7 +6,8 @@
 // Tokens will be stored by their length, and pointer to
 // their place in the file being lexed.
 
-// Ensure when you modify this, you modify the string_array inside debug.h.
+// Ensure when you modify this, you modify the string_array inside debug.h,
+// and op_string in ast_print.c for ops.
 enum TokenKind {
     // ---- Special tokens ----
     TOK_EOF,
@@ -39,7 +40,7 @@ enum TokenKind {
 
     // ---- Operators ----
     PLUS,
-    MINUS,
+    MINUS, // also unary
     MULT,
     DIV,
     EQ, // =
@@ -47,6 +48,13 @@ enum TokenKind {
     NEQ,
     LESS_THAN,
     GREATER_THAN,
+    LT_EQ, // unused
+    GT_EQ, // unused
+
+    // --- Unary ops --- (unused)
+    NOT,
+    AND,
+    OR,
 
     // --- Error token ---
     NO_TOKEN,

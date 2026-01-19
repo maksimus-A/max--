@@ -1,31 +1,7 @@
-/*
-int x = 6;
-int y = 2;
-int z = 8;
+int xy = 1;
 
-int i = (z) * (x - y) / (x*y-(x-y)); // 8 * 4 / (12-4) = 32/8 = 4
-exit(x*y*i); */
+fn main(): int {
+    int a = xy + 1;
 
-
-int x = 8;
-int y = 3;
-int z = 5;
-
-
-int a = 4;
-int b = 32;
-int c = 234;
-int d = 23;
-int e = 234;
-
-int r = x*y - z*(x - y/z) + (x - y)*(z - x/y);
-int s = r + 1034;
-int t = s + 5;
-
-r = a + b * c/d - e + 13 * (a+b+c+d+e);
-return r; // should return 34
-
-
-// int i = (x + y * z) / x;    // 6 + (2*8) / 2 = (6 + 16) / 2 = 22 / 2 = 11
-// exit(i); // ret 11
-
+    return a;
+}

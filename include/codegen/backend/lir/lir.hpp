@@ -13,6 +13,14 @@ extern "C" {
 
 class BackendContext;
 
+enum class Use {
+    AddSub_LHS,
+    AddSub_RHS,
+    Cmp_LHS,
+    Cmp_RHS,
+    Mul,
+};
+
 
 // todo: make table in BackendContext that stores vregid->VRegInfo
 struct VRegInfo { // virtual register (for temps)

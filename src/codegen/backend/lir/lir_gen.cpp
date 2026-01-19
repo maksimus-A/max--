@@ -201,8 +201,8 @@ private:
                 binop.rhs.value_id.imm = abs(binop.rhs.value_id.imm);
             }
         }
-        Operand lhs = lower_alu_operand(binop.lhs);
-        Operand rhs = lower_alu_operand(binop.rhs);
+        Operand lhs = lower_op_for_use(binop.lhs, Use::AddSub_LHS);
+        Operand rhs = lower_op_for_use(binop.rhs, Use::AddSub_RHS);
         BinOpKind binop_kind = binop.kind;
         LIRBinOp lir_binop = LIRBinOp(binop_kind, VRegId{binop.dst.id}, lhs, rhs);
         insert_instruction(lir_binop);
@@ -243,7 +243,7 @@ private:
         // TODO** Working on this. I need to understand how ARM handles comparisons/branches.
         // Opted to just lower it during emission or something IDK.
         LIRSetCC lir_setcc = LIRSetCC(VRegId{cmp.dst.id}, cmp.kind, 
-            lower_alu_operand(cmp.lhs), lower_alu_operand(cmp.rhs));
+            lower_op_for_use(cmp.lhs, Use::Cmp_LHS), lower_op_for_use(cmp.rhs, Use::Cmp_RHS));
         insert_instruction(lir_setcc);
     }
 
@@ -308,16 +308,42 @@ private:
     // todo: could unify these later.
     // Checks if 'imm' fits, if not emit const op
     // Currently for add/sub/cmp ops.
-    Operand lower_alu_operand(const IRValue& val) {
+    Operand lower_op_for_use(const IRValue& val, const Use use) {
         if (val.value_kind == IRVAL_TEMP) {
             return Operand{VRegId{val.value_id.temp_id.id}};
         }
         else if (val.value_kind == IRVAL_IMM) {
-            if (!fits_add_imm(val.value_id.imm)) {
-                VRegId vreg = create_const(val.value_id.imm);
-                return Operand{vreg};
-            }
-            return Operand{val.value_id.imm};
+            VRegId vreg{SIZE_MAX};
+            switch (use) {
+                case Use::AddSub_LHS:
+                {
+                    vreg = create_const(val.value_id.imm);
+                    return Operand{vreg};
+                }
+                case Use::AddSub_RHS:
+                {
+                    if (!fits_add_imm(val.value_id.imm)) {
+                        vreg = create_const(val.value_id.imm);
+                        return Operand{vreg};
+                    }
+                    return Operand{val.value_id.imm};
+                }
+                case Use::Cmp_LHS:
+                {
+                    vreg = create_const(val.value_id.imm);
+                    return Operand{vreg};
+                }
+                case Use::Cmp_RHS:
+                {
+                    if (!fits_add_imm(val.value_id.imm)) {
+                        VRegId vreg = create_const(val.value_id.imm);
+                        return Operand{vreg};
+                    }
+                    return Operand{val.value_id.imm};
+                }
+                case Use::Mul: break; // shouldn't happen yet.
+            };
+            if (vreg.id != SIZE_MAX) return Operand{vreg};
         }
         assert(false);
     }

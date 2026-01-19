@@ -1,0 +1,49 @@
+fn big_math(int start): int {
+    // 20 variables, all initialized
+    int a = start + 1;
+    int b = start + 2;
+    int c = start + 3;
+    int d = start + 4;
+    int e = start + 5;
+    int f = start + 6;
+    int g = start + 7;
+    int h = start + 8;
+    int i = start + 9;
+    int j = start + 10;
+    int k = start + 11;
+    int l = start + 12;
+    int m = start + 13;
+    int n = start + 14;
+    int o = start + 15;
+    int p = start + 16;
+    int q = start + 17;
+    int r = start + 18;
+    int s = start + 19;
+    int t = start + 20;
+
+    // Do some intermediate math to ensure they stay live
+    // and force the allocator to juggle them.
+    a = a + b;
+    c = c + d;
+    e = e + f;
+    g = g + h;
+    i = i + j;
+    k = k + l;
+    m = m + n;
+    o = o + p;
+    q = q + r;
+    s = s + t;
+
+    // Use EVERYTHING at the end.
+    // This forces the live ranges of all 20 vars to overlap here.
+    int sum = a + c + e + g + i + k + m + o + q + s;
+    return sum;
+}
+
+fn main(): int {
+    // Input 1.
+    // a=2, b=3... t=21
+    // a becomes 5, c becomes 9, etc...
+    // The sum should be calculated correctly despite intense spilling.
+    return big_math(1); // ans: 230
+}

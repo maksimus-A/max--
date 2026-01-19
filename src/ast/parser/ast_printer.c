@@ -13,7 +13,12 @@ const char* op_string[TOK_COUNT] = {
     [EQQ] = "==",
     [NEQ] = "!=",
     [LESS_THAN] = "<",
-    [GREATER_THAN] = ">"
+    [GREATER_THAN] = ">",
+    [LT_EQ] = "<=",
+    [GT_EQ] = ">=",
+    [NOT] = "not",
+    [AND] = "and",
+    [OR] = "or"
 };
 
 char* get_type_string(BuiltInType type) {
@@ -124,6 +129,18 @@ void dump_ast(ASTNode* node, Source* source_file, int indent) {
             }
             printf(")\n");
 
+            break;
+        }
+        case AST_UNARY_OP:
+        {
+            printf("UnaryOp id={%zu} operator={%s", node->id, op_string[node->node_info.un_op.op.token_kind]);
+            printf("}\n");
+            indent++;
+            // Print expr
+            dump_ast(node->node_info.un_op.expr, source_file, indent);
+            indent--;
+            print_indentation(indent);
+            printf(")\n");
             break;
         }
         case AST_BIN_OP:

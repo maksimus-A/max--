@@ -36,6 +36,12 @@ static const char* token_kind_str[TOK_COUNT+1] = {
     /* NEQ */              "!=",
     /* LESS_THAN */        "<",
     /* GREATER_THAN */     ">",
+    /* LT_EQ */            "<=",
+    /* GT_EQ */            ">=",
+
+    /* NOT */              "NOT",
+    /* AND */              "AND",
+    /* OR */               "OR",
 
 
     /* NO TOKEN */         "NO_TOKEN",

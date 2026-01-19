@@ -1,4 +1,5 @@
 fn tak(int x, int y, int z): int {
+    // 63,609 function calls?!?!
     if (y < x) {
         // This is the torture test.
         // The results of the first two tak() calls MUST be preserved
@@ -10,7 +11,7 @@ fn tak(int x, int y, int z): int {
             tak(z - 1, x, y)
         );
     } else {
-        return y;
+        return z;
     }
 }
 

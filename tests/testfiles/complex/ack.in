@@ -1,0 +1,18 @@
+fn ack(int m, int n): int {
+    if (m == 0) {
+        return n + 1;
+    }
+    if (n == 0) {
+        return ack(m - 1, 1);
+    }
+    // Nested call as an argument
+    return ack(m - 1, ack(m, n - 1));
+}
+
+fn main(): int {
+    // ack(3, 2) = 29
+    // ack(3, 3) = 61
+    // ack(3, 4) = 125
+    // ack(4, 1) = 65,533 (mod 256) = 253
+    return ack(4, 1); 
+}

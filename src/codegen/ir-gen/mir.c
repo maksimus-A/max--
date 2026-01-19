@@ -309,9 +309,8 @@ bool emit_load(IRBuilder* builder, ASTNode* node, TempId dst, SlotId src) {
 
 
 
-static bool emit_binop(IRBuilder* builder, ASTNode* node, TempId dst, IRValue lhs, IRValue rhs) {
-    // grab LHS/RHS from node, store them into op with opkind
-    BinOpKind binop_kind = get_binop_kind(node);
+static bool emit_binop(IRBuilder* builder, BinOpKind binop_kind, ASTNode* node, TempId dst, IRValue lhs, IRValue rhs) {
+
 
     BinOp binop = (BinOp) {
         .dst = dst,
@@ -336,9 +335,8 @@ static bool emit_binop(IRBuilder* builder, ASTNode* node, TempId dst, IRValue lh
 }
 
 // Comparison operation.
-static bool emit_cmpop(IRBuilder* builder, ASTNode* node, TempId dst, IRValue lhs, IRValue rhs) {
-    // grab LHS/RHS from node, store them into op with opkind
-    CmpKind cmp_kind = get_cmp_kind(node);
+static bool emit_cmpop(IRBuilder* builder, CmpKind cmp_kind, ASTNode* node, TempId dst, IRValue lhs, IRValue rhs) {
+
 
     Cmp cmp = (Cmp) {
         .dst = dst,
@@ -795,13 +793,7 @@ void mir_gen_post(void* user, ASTNode* node) {
             VEC_PUSH_T(&builder->val_stack, call_result);
             break;
         }
-        case AST_BLOCK:
-        {
-            // Pop scope? nah. not unless parent of block is cf.
-            break;
-        }
         case AST_VAR_DEC: 
-        // DONE REFACTOR
         {
             IRFunction* f = get_curr_func(builder);
             Symbol* sym = get_symbol(builder, node);
@@ -847,6 +839,37 @@ void mir_gen_post(void* user, ASTNode* node) {
             emit_store(builder, node, lhs_slot, expr_val);
             break;
         }
+        case AST_UNARY_OP:
+        {
+            IRValue rhs = get_ir_value_stack(builder);
+            IRFunction* f = get_curr_func(builder);
+
+            TempId temp = create_temp_id(builder);
+
+            if (node->node_info.un_op.op.token_kind == MINUS) {
+                // "Fake" sub op with 0.
+
+                // Create 0 LHS
+                IRValue lhs = (IRValue) {
+                    .value_kind = IRVAL_IMM,
+                    .value_type = TYPE_INT,
+                    .value_id.imm = 0
+                };
+
+                // Emit subtraction
+                emit_binop(builder, BIN_SUB, node, temp, lhs, rhs);
+
+                // Push IRValue onto stack
+                IRValue val = (IRValue) {
+                    .value_kind = IRVAL_TEMP,
+                    .value_id.temp_id = temp
+                };
+                VEC_PUSH_T(&builder->val_stack, val);
+            }
+
+
+            break;
+        }
         case AST_BIN_OP:
         case AST_CMP_OP:
         {
@@ -870,8 +893,16 @@ void mir_gen_post(void* user, ASTNode* node) {
             // now create new temp?
             TempId temp = create_temp_id(builder);
 
-            if (node->ast_kind == AST_BIN_OP) emit_binop(builder, node, temp, lhs, rhs);
-            if (node->ast_kind == AST_CMP_OP) emit_cmpop(builder, node, temp, lhs, rhs);
+            if (node->ast_kind == AST_BIN_OP) {
+                // grab LHS/RHS from node, store them into op with opkind
+                BinOpKind binop_kind = get_binop_kind(node);
+                emit_binop(builder, binop_kind, node, temp, lhs, rhs);
+            }
+            if (node->ast_kind == AST_CMP_OP) {
+                // grab LHS/RHS from node, store them into op with opkind
+                CmpKind cmp_kind = get_cmp_kind(node);
+                emit_cmpop(builder, cmp_kind, node, temp, lhs, rhs);
+            }
 
             // Push IRValue onto stack
             IRValue val = (IRValue) {

@@ -377,6 +377,31 @@ ASTNode* parse_primary(Parser* parser, Source* source_file) {
     return expr;
 }
 
+// Parse any unary ops (-, and 'not')
+ASTNode* parse_prefix(Parser* parser, Source* source_file) {
+
+    if (current(parser).token_kind == MINUS || current(parser).token_kind == NOT) {
+        size_t un_start = current(parser).start;
+
+        ASTNode* unary = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
+
+        unary->ast_kind = AST_UNARY_OP;
+        unary->id = parser->curr_id++;
+        UnOpInfo un_op = (UnOpInfo) {
+            .op = current(parser).token_kind
+        };
+        advance(parser);
+        un_op.expr = parse_prefix(parser, source_file);
+        unary->node_info.un_op = un_op;
+        unary->span = create_span_from(un_start, un_op.expr->span.start + un_op.expr->span.length);
+        return unary;
+    }
+    else {
+        // No unary op; proceed as normal
+        return parse_primary(parser, source_file);
+    }
+}
+
 // Parses postfix ops of an expression (currently function calls)
 // For a function, starts at '('
 ASTNode* parse_postfix(Parser* parser, Source* source_file, ASTNode* lhs) {
@@ -437,7 +462,7 @@ ASTNode* parse_postfix(Parser* parser, Source* source_file, ASTNode* lhs) {
 // todo: add error handling.
 ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
     // Get LHS of binary expression (if it exists), and consume.
-    ASTNode* LHS = parse_primary(parser, source_file);
+    ASTNode* LHS = parse_prefix(parser, source_file);
     if (LHS->ast_kind == AST_ERROR) return NULL;
 
     LHS = parse_postfix(parser, source_file, LHS);
@@ -604,14 +629,16 @@ ASTNode* parse_return(Parser* parser, Source* source_file) {
 // Parse assignment statement (x = 2;)
 ASTNode* parse_assn(Parser* parser, Source* source_file) {
     // TODO: Get the span of this assn.
+    size_t assn_start = current(parser).start;
+
     ASTNode* assn_stmt = (ASTNode*)arena_alloc(parser->ast_arena, sizeof(ASTNode), alignof(ASTNode));
     assn_stmt->ast_kind = AST_ASSN;
     assn_stmt->id = parser->curr_id;
     parser->curr_id++;
 
     SrcSpan name_span;
-    name_span = create_span_from(parser->tokens->data[parser->token_index].start, 
-            parser->tokens->data[parser->token_index].start + parser->tokens->data[parser->token_index].length);
+    name_span = create_span_from(current(parser).start, 
+            current(parser).start + current(parser).length);
 
     char* err_msg = alloc_error(parser->diags);
     advance(parser);
@@ -625,9 +652,9 @@ ASTNode* parse_assn(Parser* parser, Source* source_file) {
             .type = TYPE_INT,
             .init_expr = expr_node
         };
+        assn_stmt->span = create_span_from(assn_start, current(parser).start);
     }
     else {
-        // todo: check name_span is correct.
         assn_stmt->ast_kind = AST_ERROR;
         add_diag(parser->diags, ERROR, name_span, err_msg, current(parser).line, current(parser).col);
         sync_to_boundary(parser);
@@ -640,13 +667,6 @@ ASTNode* parse_assn(Parser* parser, Source* source_file) {
         add_diag(parser->diags, ERROR, name_span, err_msg, current(parser).line, current(parser).col);
     }
     return assn_stmt;
-}
-
-// Parses condition; assumes starts inside parentheses.
-// TODO: IDK if this needs to exist.
-ASTNode* parse_cond(Parser* parser, Source* source_file) {
-
-    return NULL;
 }
 
 // Parse if/else, and conditional. Starts at 'IF' token.
@@ -904,13 +924,13 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
         }
         else if (starts_stmt(parser)) {  // Currently supports: assignments, returns, if, while, fn calls
             switch (current(parser).token_kind) {
-                case IDENTIFIER:
+                case IDENTIFIER: // assignment statement
                 {
                     if (next(parser).token_kind == EQ) {
                         ASTNode* assn = parse_assn(parser, source_file);
                         push_node(parser, list, assn);
                     }
-                    // TODO: Consider NOT checking paren_start and arbitrarily parsing an expr instead? idk.
+                    // Parse function call.
                     else if (next(parser).token_kind == PAREN_START) {
                         // blah blah
                         ASTNode* expr = parse_expr(parser, source_file, 0);
@@ -955,7 +975,7 @@ static void parse_item_list(Parser* parser, NodeList* list, Source* source_file,
             push_node(parser, list, block_node);
         }
         else {
-            printf("Token kind after unknown tok:");
+            printf("Token kind after unknown tok: ");
             print_token_kind(current(parser).token_kind);
             add_err_msg(parser, "Unexpected token.", current(parser).line, current(parser).col);
             //TODO* Remove this once more things r implemented.

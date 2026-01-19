@@ -1,0 +1,6 @@
+fn main(): int {
+    int x = !1;
+    int y = not x;
+
+    return x;
+}

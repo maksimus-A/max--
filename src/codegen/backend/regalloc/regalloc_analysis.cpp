@@ -450,7 +450,6 @@ private:
             },
             [&](const LIRRet& ret) {
                 if (ret.has_value){
-                    out << "Pushed vreg val from return\n";
                     maybe_push_vreg(used, ret.id);
                 }
             },

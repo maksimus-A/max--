@@ -1,0 +1,28 @@
+fn Q(int n): int {
+    if (n == 1) { return 1; }
+    if (n == 2) { return 1; }
+
+    // This is the killer line.
+    // 1. Call Q(n-1) -> store in t1
+    // 2. Calc (n - t1) -> arg1
+    // 3. Call Q(arg1) -> store in term1
+    // ... repeat for term2 ...
+    
+    int t1 = Q(n - 1);
+    int term1 = Q(n - t1);
+
+    int t2 = Q(n - 2);
+    int term2 = Q(n - t2);
+
+    return term1 + term2;
+}
+
+fn main(): int {
+    // Q(1) through Q(10) are: 1, 1, 2, 3, 3, 4, 5, 5, 6, 6
+    // Q(12) is 8. 
+    // Q(15) is 9.
+    
+    // Warning: Without arrays, n=20 will take a LONG time. 
+    // Start small (10 or 12).
+    return Q(50);
+}
