@@ -71,7 +71,8 @@ public:
         note_def(get_vreg(con.dst));
     }
     void visit(const LIRRet& ret) override {
-        note_use(get_vreg(ret.id));
+        if (ret.has_value)
+            note_use(get_vreg(ret.id));
     }
     void visit(const LIRSetCC& setcc) {
         note_def(get_vreg(setcc.dst));

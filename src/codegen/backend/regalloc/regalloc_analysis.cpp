@@ -89,6 +89,13 @@ public:
             std::vector<Interval>& unhandled = curr_info->intervals;
             RegAllocInfo regalloc = RegAllocInfo(ARM_FREE_REGS, ARM_FREE_CALLEE_REGS, f.max_slot_id, f.next_vreg);
 
+            // Erase any intervals that don't have any ranges inside them.
+            // Should fix 'void' bug.
+            unhandled.erase(
+            std::remove_if(unhandled.begin(), unhandled.end(),
+            [](const Interval& it) { return it.ranges.empty(); }),
+            unhandled.end());
+
             // Sort the intervals by their start of first range.
             std::sort(unhandled.begin(), unhandled.end(),
             [](const Interval& a, const Interval& b) {
@@ -197,7 +204,11 @@ public:
                 rewrite_reg_if_vreg_in_map(cons.dst, vreg_to_preg);
             },
             [&](LIRRet& ret) {
-                rewrite_reg_if_vreg_in_map(ret.id, vreg_to_preg);
+                if (ret.has_value)
+                    rewrite_reg_if_vreg_in_map(ret.id, vreg_to_preg);
+                else {
+
+                }
             },
             [&](LIRBinOp& binop) {
                 rewrite_reg_if_vreg_in_map(binop.dst, vreg_to_preg);
@@ -251,23 +262,37 @@ public:
 
         for (const auto& vreg : uses(inst)) {
             all_vregs.insert(vreg.id);
-            const Location& L = locs.at(vreg.id);
-            if (L.kind == LOC_SLOT) spilled_uses.insert(vreg.id);
+            // Check bounds, though locs should be sized to max_vreg
+            if (vreg.id < locs.size()) {
+                const Location& L = locs.at(vreg.id);
+                if (L.kind == LOC_SLOT) spilled_uses.insert(vreg.id);
+            }
         }
         for (const auto& vreg : defs(inst)) {
             all_vregs.insert(vreg.id);
-            const Location& L = locs.at(vreg.id);
-            if (L.kind == LOC_SLOT) spilled_defs.insert(vreg.id);
+            if (vreg.id < locs.size()) {
+                const Location& L = locs.at(vreg.id);
+                if (L.kind == LOC_SLOT) spilled_defs.insert(vreg.id);
+            }
         }
 
         for (std::size_t vreg_id : all_vregs) {
+            // Safety check for vreg bounds
+            if (vreg_id >= locs.size()) continue;
+
             const Location& L = locs.at(vreg_id);
+            
             if (L.kind == LOC_PREG) {
                 vreg_to_preg.emplace(vreg_id, PRegId{L.id});
             } else if (L.kind == LOC_SLOT) {
                 PRegId scratch = scratch_regs.acquire();
                 vreg_to_preg.emplace(vreg_id, scratch);
                 spilled_slot.emplace(vreg_id, SlotId{L.id});
+            } else {
+                // HANDLE LOC_UNINIT (Dead definitions, e.g. void call results)
+                // Assign a dummy register (x9 / Caller Saved 0) just so the instruction 
+                // has a valid physical register. Since it's dead, clobbering x9 is fine.
+                vreg_to_preg.emplace(vreg_id, PRegId{CALLER_SAVED_IDS[0]});
             }
         }
 
@@ -424,7 +449,10 @@ private:
                 maybe_push_vreg(used, store.src);
             },
             [&](const LIRRet& ret) {
-                maybe_push_vreg(used, ret.id);
+                if (ret.has_value){
+                    out << "Pushed vreg val from return\n";
+                    maybe_push_vreg(used, ret.id);
+                }
             },
             [&](const LIRSetCC& setcc){ 
                 maybe_push_vreg(used, setcc.lhs);

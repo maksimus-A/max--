@@ -729,6 +729,7 @@ ASTNode* parse_while_stmt(Parser* parser, Source* source_file) {
 BuiltInType get_builtin_type(Token token) {
     switch (token.token_kind) {
         case INT: return TYPE_INT;
+        case VOID: return TYPE_VOID;
         default: return TYPE_UNKNOWN; break;
     }
 }

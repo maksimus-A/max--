@@ -3,7 +3,7 @@ fn main(): int {
     int y = 2;
     int z = add(x, y);
 
-    return z + x; // 3
+    return z; // 3
 }
 
 fn add(int x, int y): int {

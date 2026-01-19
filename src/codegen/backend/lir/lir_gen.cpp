@@ -269,15 +269,20 @@ private:
 
     void create_ret(const IRInstruct& inst) {
         const Halt& halt = inst.payload.halt_payload;
-
-        LIRRet lir_ret = 
-            (halt.code.value_kind == IRVAL_TEMP)
-                ? LIRRet(VRegId{halt.code.value_id.temp_id.id})
-                : [&] {
-                    VRegId vreg = create_const(halt.code.value_id.imm);
-                    return LIRRet(vreg);
-                }();
-        insert_terminator(lir_ret);
+        if (halt.has_value) {
+            LIRRet lir_ret = 
+                (halt.code.value_kind == IRVAL_TEMP)
+                    ? LIRRet(VRegId{halt.code.value_id.temp_id.id})
+                    : [&] {
+                        VRegId vreg = create_const(halt.code.value_id.imm);
+                        return LIRRet(vreg);
+                    }();
+            insert_terminator(lir_ret);
+        }
+        else {
+            LIRRet lir_ret = LIRRet();
+            insert_terminator(lir_ret);
+        }
     }
 
     // Binary operator helpers

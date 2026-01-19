@@ -136,7 +136,8 @@ static void print_term(const std::optional<LIRTerm>& term, const BlockId& bid, c
     if (std::holds_alternative<LIRRet>(term->pl)) {
         LIRRet ret = std::get<LIRRet>(term->pl);
         out << "ret ";
-        print_reg(ret.id, out);
+        if (ret.has_value)
+            print_reg(ret.id, out);
     }
     if (alt<LIRBranch>(term->pl)) {
         const LIRBranch br = get<LIRBranch>(term->pl);

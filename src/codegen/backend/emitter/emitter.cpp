@@ -22,24 +22,31 @@ public:
 
             curr_frame_info = ctx.get_frame_info_ptr(f.id);
 
-            // TODO: Remove 'main' hack when real funcs exist.
-            emit_main_label();
-            emit_prologue();
+            if (ctx.func_is_main(f.fn_sym_id)) {
+                emit_main_label();
+            }
+            else {
+                emit_function_label(f);
+            }
+
+            emit_prologue(f);
             for (auto& b: ctx.lir_blocks(f)) {
                 if (b.id.id != f.entry.id) emit_block_label(f.id, b.id);
 
                 for (auto& i: ctx.lir_insts(b)) {
-                    emit_instruction(i, f.id);
+                    emit_instruction(i, f);
                 }
                 const LIRInstruct& t = ctx.get_terminator(b.term);
-                emit_instruction(t, f.id);
+                emit_instruction(t, f);
             }
 
-            emit_epilogue(f.id);
+            emit_epilogue(f);
         }
+
+        if (debug) dout << "ARM Emitted successfully!\n";
     }
 
-    void emit_instruction(const LIRInstruct& i, const FuncId& fid) {
+    void emit_instruction(const LIRInstruct& i, const LIRFunction& f) {
 
         std::visit(overloaded{
             [&](const LIRLoad& load) {
@@ -60,8 +67,10 @@ public:
                 emit_const(cons);
             },
             [&](const LIRRet& ret) {
-                emit_line("\tmov ", RET, ", ", reg(ret.id));
-                emit_line("\tb ", func_ret_label(fid));
+                if (ret.has_value) {
+                    emit_line("\tmov ", RET, ", ", reg(ret.id)); // RET = x0 or w0
+                }
+                emit_line("\tb ", func_ret_label(f.id));
             },
             [&](const LIRBinOp& binop) {
 
@@ -93,14 +102,27 @@ public:
             },
             [&](const LIRBranch& br) {
                 // Emit 'CBNZ' (Conditional branch if not zero?)
-                emit_line("\tcbnz ", reg(br.cmp), ", ", block_label(fid, br.non_zero));
+                emit_line("\tcbnz ", reg(br.cmp), ", ", block_label(f.id, br.non_zero));
                 // Emit unconditional branch to 'zero' target
-                emit_line("\tb ", block_label(fid, br.zero));
+                emit_line("\tb ", block_label(f.id, br.zero));
             },
             [&](const LIRJump& j) {
-                emit_line("\tb ", block_label(fid, j.jump_to));
+                emit_line("\tb ", block_label(f.id, j.jump_to));
             },
-            [&](const auto&) {/* TODO: Implement rest of ops!*/}
+            [&](const LIRArgGet& arg_get) {
+                // Doesn't support argument spills yet.
+                assert(arg_get.src < 8);
+                emit_line("\tmov ", reg(arg_get.dst), ", ", "x", arg_get.src);
+            },
+            [&](const LIRArgPut& arg_put) {
+                assert(arg_put.dst < 8);
+                emit_line("\tmov x", arg_put.dst, ", ", reg(arg_put.src));
+            },
+            [&](const LIRCall& call) {
+                emit_line("\tbl ", function_label(call.fn_sym_id));
+                emit_line("\tmov ", reg(call.dst), ", ", RET);
+            },
+            // [&](const auto&) {/* TODO: Implement rest of ops!*/}
         }, i.pl);
     }
 
@@ -132,13 +154,37 @@ public:
         emit_line("function_", fid.id, ":");
     }
 
+    // Used for returns? IDK.
     std::string function_label(const FuncId& fid) {
         return "function_" +std::to_string(fid.id);
+    }
+
+    std::string function_label(int fn_sym_id) {
+        if (ctx.func_is_main(fn_sym_id)) {
+            return "_main";
+        }
+
+        const Symbol* fn_sym = ctx.get_symbol(fn_sym_id);
+        const char* start = ctx.start_of_name(fn_sym_id);
+        std::string_view fn_name(start, fn_sym->symbol_span.length);
+
+        std::string label;
+        label.reserve(1 + fn_name.size());
+        label.push_back('_');
+        label.append(fn_name);
+        return label;
     }
 
     // Needed for archARM to run properly.
     void emit_main_label() {
         emit_line("_main:");
+    }
+
+    void emit_function_label(const LIRFunction& f) {
+        const char* start = ctx.start_of_name(f.fn_sym_id);
+        const Symbol* fn_sym = ctx.get_symbol(f.fn_sym_id);
+        std::string_view fn_name(start, fn_sym->symbol_span.length);
+        emit_line("_", fn_name, ":");
     }
 
     // Each functionid/blockid pair is unique.
@@ -152,18 +198,45 @@ public:
     }
 
     // Prologue/epilogue emission
-    void emit_prologue() {
+    void emit_prologue(const LIRFunction& f) {
         emit_line("\tstp x29, x30, [sp, #-16]!");
         emit_line("\tmov x29, sp");
-        std::size_t frame_size = curr_frame_info->total_frame_size;
-        emit_line("\tsub sp, sp, #", frame_size);
-        
+
+        // emit a sp move if remaining size > 0
+        std::size_t remaining_size = curr_frame_info->total_frame_size - 16;
+        if (remaining_size > 0) {
+            emit_line("\tsub sp, sp, #", remaining_size);
+        }
+        // create stack offsets of callee regs
+        const std::vector<int>& used_regs = ctx.fn_used_callee_regs[f.id.id];
+
+        // save Callee-Saved Registers to the VIP Area
+        for (int reg_id : used_regs) {
+            // Retrieve the pre-calculated offset 
+            int32_t offset = curr_frame_info->callee_reg_offsets[reg_id];
+            
+            // Emit: str x19, [x29, #-24]
+            emit_line("\tstr x", reg_id, ", [x29, #", offset, "]");
+        }
     }
 
     // Assumes 'ret' is stored in x0 already.
-    void emit_epilogue(const FuncId& fid) {
-        emit_line(func_ret_label(fid), ":");
-        emit_line("\tadd sp, sp, #", curr_frame_info->total_frame_size);
+    void emit_epilogue(const LIRFunction& f) {
+        emit_line(func_ret_label(f.id), ":");
+
+        const std::vector<int>& used_regs = ctx.fn_used_callee_regs[f.id.id];
+
+        for (int reg_id: used_regs) {
+            // Retrieve the pre-calculated offset 
+            int32_t offset = curr_frame_info->callee_reg_offsets[reg_id];
+            
+            // Emit: str x19, [x29, #-24]
+            emit_line("\tldr x", reg_id, ", [x29, #", offset, "]");
+        }
+        // dealloc stack pointer by moving to FP (safe way)
+        emit_line("\tmov sp, x29"); 
+
+        // load LR/FP and return
         emit_line("\tldp x29, x30, [sp], #16");
         emit_line("\tret");
     }
@@ -184,16 +257,6 @@ private:
     std::ostream& dout; // debug out
     std::ostream& armout; // actual ARM file out
     FrameInfo* curr_frame_info;
-
-    static constexpr ArchReg ARM_GPR_POOL[ARM_FREE_REGS] = { // pool of free regs
-        ArchReg::X9,
-        ArchReg::X10,
-        ArchReg::X11,
-        ArchReg::X12,
-        ArchReg::X13,
-        ArchReg::X14,
-        ArchReg::X15,
-    };
 
     const char* arch_reg_name(ArchReg r) {
         static constexpr const char* names[] = {
@@ -264,7 +327,7 @@ private:
     const char* reg(Reg reg) {
         if (alt<PRegId>(reg.id)) {
             PRegId preg = get<PRegId>(reg.id);
-            return arch_reg_name(ARM_GPR_POOL[preg.id]);
+            return arch_reg_name(static_cast<ArchReg>(preg.id));
         }
         return "no-reg-found";
     }

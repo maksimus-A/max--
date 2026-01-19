@@ -4,6 +4,7 @@
 #include "codegen/backend/frame-layout/frame_layout.hpp"
 #include "vector/vec_view.hpp"
 #include <vector>
+#include <string_view>
 extern "C" {
     #include "common.h"
     #include "codegen/ir-gen/mir.h"
@@ -123,6 +124,19 @@ public:
         return &source_file.buffer[span.start];
     }
 
+    // Grabs string name from symbol ID.
+    char* start_of_name(size_t sym_id) {
+        TableView<Symbol> syms = TableView<Symbol>(*mod.name_resolution);
+        Symbol sym = *syms[sym_id];
+
+        return start_of_name(sym.symbol_span);
+    }
+
+    const Symbol* get_symbol(size_t sym_id) {
+        TableView<Symbol> syms = TableView<Symbol>(*mod.name_resolution);
+        return syms[sym_id];
+    }
+
     // Prints symbol name from name resolution (which is symid->Symbol*)
     const void print_symbol_name(size_t sym_id, std::ostream& out) const {
         TableView<Symbol> syms = TableView<Symbol>(*mod.name_resolution);
@@ -130,6 +144,16 @@ public:
 
         char* start = start_of_name(sym.symbol_span);
         print_file_slice(start, sym.symbol_span.length, out);
+    }
+
+    bool func_is_main(size_t sym_id) {
+        TableView<Symbol> syms = TableView<Symbol>(*mod.name_resolution);
+        Symbol sym = *syms[sym_id];
+
+        const char* start = start_of_name(sym.symbol_span);
+        std::string_view name(start, sym.symbol_span.length);
+
+        return name == "main";
     }
 
     // Regalloc stuff

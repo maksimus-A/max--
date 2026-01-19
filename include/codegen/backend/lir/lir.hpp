@@ -83,7 +83,12 @@ struct LIRConst {
 // MIR Halt == LIR Ret
 struct LIRRet {
     explicit LIRRet(VRegId code_)
-        : id(code_) {}
+        : has_value(true), id(code_) {}
+
+    explicit LIRRet()
+        : has_value(false), id(VRegId{SIZE_MAX}) {}
+
+    bool has_value;
     Reg id;
 };
 
