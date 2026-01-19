@@ -19,17 +19,44 @@ public:
 
         }
 
-    void define_frame_layout_of_slots() {
-
+void define_frame_layout_of_slots() {
         ctx.frame_info.resize(ctx.lir_funcs.size());
 
         for (auto& f: ctx.lir_funcs) {
 
-            // Get # of slots
-            size_t slots_used = f.max_slot_id;
-            // Define insertion cursor
-            size_t cursor = 0;
+            // Start Depth at 16 (Reserved for FP/LR)
+            //    [FP+0] = Old FP, [FP+8] = LR
+            size_t current_depth = 16; 
+            
+            // --- CALLEE SAVED REGISTERS ---
+            std::vector<int>& used_callee_regs = ctx.fn_used_callee_regs[f.id.id];
+            
+            // Prepare the lookup table
+            std::vector<int32_t> callee_reg_offsets;
+            callee_reg_offsets.assign(64, 0);
+
+            for (int reg_id : used_callee_regs) {
+                // Grow depth by 8 bytes
+                current_depth += 8;
+                
+                callee_reg_offsets[reg_id] = -((int32_t)current_depth);
+            }
+
+            // Calculate size used purely by callee regs (for stats)
+            size_t callee_save_size = used_callee_regs.size() * 8;
+
+            // OPTIONAL: Re-align depth to 16 bytes before starting slots?
+            // This keeps the "Locals" block aligned, which is good practice.
+            current_depth = align_up(current_depth, 16);
+
+
+            // --- SLOTS (LOCALS/SPILLS) ---
             std::vector<SlotFrameInfo> slot_map;
+            size_t slots_used = f.max_slot_id;
+            
+            // Calculate size used purely by locals (start tracking relative to current depth)
+            size_t start_of_locals = current_depth;
+
             for (size_t i = 0; i < slots_used; i++) {
                 // I have made per-function slot id's, stored in the function.
                 // The maximum slot id == next_slot_id.
@@ -40,38 +67,39 @@ public:
                     if (debug) out << "Slot " << i << ": Symbol not found in table. Assuming new spilled slot, and defaulting to type=8, align=8." <<std::endl;
 
                     slot_sa = SizeAlign{8, 8};
-                }
-                else {
-                    BuiltInType sym_type;
-                    if (sym->kind == SYM_VAR) {
-                        sym_type = sym->type;
-                    }
-
-                    // Get alignment/size of symbol (based on symbol type)
+                } else {
+                    BuiltInType sym_type = (sym->kind == SYM_VAR) ? sym->type : TYPE_INT; // fallback
                     slot_sa = builtin_type_sizealign[sym_type];
                 }
 
-                // Set cursor alignment
-                cursor = align_up(cursor, slot_sa.align);
-                // Calculate FP's offset of slot
-                int fp_offset = -(cursor + slot_sa.size);
+                // Align the CURRENT depth for this specific variable
+                current_depth = align_up(current_depth, slot_sa.align);
 
-                // Assign values into slot_map
-                // Make local slot map, and assign it to frameinfo slot map.
-                SlotFrameInfo slot_frame_info = SlotFrameInfo(slot_sa.size, slot_sa.align, fp_offset);
+                // Grow depth by size
+                current_depth += slot_sa.size;
 
-                // Assign slot map
-                slot_map.push_back(slot_frame_info);
+                // Offset is negative depth
+                int32_t fp_offset = -((int32_t)current_depth);
 
-                cursor += slot_sa.size;
+                slot_map.emplace_back(slot_sa.size, slot_sa.align, fp_offset);
             }
-            size_t locals_size= align_up(cursor, FP_ALIGN);
-            size_t frame_record_size = align_up(16, FP_ALIGN);
-            size_t callee_save_size = 0; // TODO: remove hack!!
-            size_t total_frame_size = align_up(locals_size + frame_record_size + callee_save_size, FP_ALIGN);
-            // Assign found values into FrameInfo obj
-            FrameInfo frame = FrameInfo(true, true, locals_size, frame_record_size,
-                                        callee_save_size, total_frame_size, std::move(slot_map));
+
+            size_t locals_size = current_depth - start_of_locals;
+            size_t frame_record_size = 16;
+            
+            // Total frame size must be 16-byte aligned for SP
+            size_t total_frame_size = align_up(current_depth, 16);
+
+            // Construct FrameInfo
+            FrameInfo frame = FrameInfo(
+                true, true, 
+                locals_size, 
+                frame_record_size,
+                callee_save_size, 
+                total_frame_size, 
+                std::move(slot_map), 
+                std::move(callee_reg_offsets)
+            );
             
             ctx.frame_info[f.id.id] = std::move(frame);
         }
@@ -105,6 +133,7 @@ public:
             out << "  Slot Information: " << std::endl;
             print_slot_frame_info(frame.slot_map);
         }
+        out << "Frame Layout completed!\n\n";
     }
 
 
@@ -120,7 +149,7 @@ private:
         return cursor + (align - padding);
     }
 
-        void print_slot_frame_info(const std::vector<SlotFrameInfo>& slot_map) {
+    void print_slot_frame_info(const std::vector<SlotFrameInfo>& slot_map) {
         int i = 0;
         for (const auto& sfi: slot_map) {
             out << "    Slot " << i;
