@@ -866,8 +866,25 @@ void mir_gen_post(void* user, ASTNode* node) {
                 };
                 VEC_PUSH_T(&builder->val_stack, val);
             }
+            else if (node->node_info.un_op.op.token_kind == NOT) {
+                // todo: above is nearly identical; merge together.
+                // Check 'val == 0' instead.
+                IRValue lhs = (IRValue) {
+                    .value_kind = IRVAL_IMM,
+                    .value_type = TYPE_INT,
+                    .value_id.imm = 0
+                };
 
+                // Emit cmp
+                emit_cmpop(builder, CMP_EQ, node, temp, lhs, rhs);
 
+                // Push IRValue onto stack
+                IRValue val = (IRValue) {
+                    .value_kind = IRVAL_TEMP,
+                    .value_id.temp_id = temp
+                };
+                VEC_PUSH_T(&builder->val_stack, val);
+            }
             break;
         }
         case AST_BIN_OP:

@@ -1,6 +1,27 @@
 fn main(): int {
-    int x = !1;
-    int y = not x;
+    int x = unaryMess1();
+    int y = unaryMess2();
 
-    return x;
+    return x + y; // returns -6 + 1 = -5 = 251 (correct!)
+}
+
+
+fn unaryMess1(): int {
+    int a = ---5; // -5
+    int b = !!0; // 0
+    int c = not !0; // 0
+    int d = !not 0; // 0
+    int e = -!-!-1;   // forces tight unary binding // -1
+
+    return a + b + c + d + e; // -6 % 256 = 250
+}
+
+fn unaryMess2(): int {
+    int x = 2;
+    int y = 7;
+
+    return
+        (not !(-x + y * 2) + !!(x - 2))
+        + (-(not (y - 3)) * (!not (x < y)))
+        + (!(-(-(-1))) + not(!(0))); // Returns 1
 }
