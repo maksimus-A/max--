@@ -14,7 +14,7 @@ static std::string func_label(const FuncId& fid) {
 
 static void print_reg(const Reg& r, std::ostream& out) {
     if (alt<VRegId>(r.id)) out << "v" << get<VRegId>(r.id).id;
-    else if (alt<PRegId>(r.id)) out << "p" << get<PRegId>(r.id).id;
+    else if (alt<PRegId>(r.id)) out << "x" << get<PRegId>(r.id).id;
     else assert(false);
 }
 

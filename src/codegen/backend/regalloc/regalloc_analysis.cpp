@@ -83,7 +83,7 @@ public:
     void linear_scan_regalloc() {
         // Resize callee regs to # of functions
         ctx.fn_used_callee_regs.resize(ctx.lir_funcs.size());
-        
+
         for (auto& f: ctx.lir_funcs) {
             curr_info = &ctx.liveness[f.id.id];
             std::vector<Interval>& unhandled = curr_info->intervals;
@@ -211,6 +211,15 @@ public:
             },
             [&](LIRBranch& br) {
                 rewrite_reg_if_vreg_in_map(br.cmp, vreg_to_preg);
+            },
+            [&](LIRArgGet& arg_get) {
+                rewrite_reg_if_vreg_in_map(arg_get.dst, vreg_to_preg);
+            },
+            [&](LIRArgPut& arg_put) {
+                rewrite_reg_if_vreg_in_map(arg_put.src, vreg_to_preg);
+            },
+            [&](LIRCall& call) {
+                rewrite_reg_if_vreg_in_map(call.dst, vreg_to_preg);
             },
             [&](LIRJump& jump) {
                 // Jumps don't use vregs.
