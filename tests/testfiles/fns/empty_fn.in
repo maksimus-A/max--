@@ -1,0 +1,14 @@
+fn test() {
+
+}
+
+fn test2(): void {
+
+}
+
+fn main(): int {
+    test();
+    test2();
+
+    return 0;
+}

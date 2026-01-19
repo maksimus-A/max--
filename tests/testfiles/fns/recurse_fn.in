@@ -1,0 +1,10 @@
+// Recursive function call test.
+fn sumUpToN(int n): int {
+    if (n == 1) {return 1;}
+
+    return n + sumUpToN(n-1);
+}
+
+fn main(): int {
+    return sumUpToN(5);
+}

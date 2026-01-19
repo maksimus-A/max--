@@ -2,6 +2,7 @@ fn add(int x, int y): int {
     return x + y;
 }
 
+/*
 fn inc(int x): int {
     return x+1;
 }
@@ -14,7 +15,6 @@ fn fake() {
 
 }
 
-/*
 fn retTest(): int {
     int x = 1;
     int y = 2;
@@ -24,16 +24,13 @@ fn retTest(): int {
 
     x = x + 1;
     return x;
-}*/
-
-// Recursive function call test.
-fn sumUpToN(int n): int {
-    if (n == 1) {return 1;}
-
-    return n + sumUpToN(n-1);
 }
 
+
+*/
+
 // weird function test (testing successor/CFG building from blocks.)
+/*
 fn weird1(int n): int {
     int i = 0;
     int acc = 0;
@@ -51,18 +48,19 @@ fn weird1(int n): int {
     }
 
     return acc;
-}
+}*/
 
 fn main(): int {
     int x = 1;
     int y = 2;
 
     // Void function tests
-    fake();
+    //fake();
     //retTest();
 
     // Nested function call tests
-    int z = add(x, y) + add(inc(inc(x)), one()) * 2;
+    //int z = add(x, y) + add(inc(inc(x)), one()) * 2;
+    int z = add(add(x, y), y);
 
     return z;
 }

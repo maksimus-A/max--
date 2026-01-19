@@ -1,0 +1,11 @@
+fn one(): int { return 1; }
+
+fn add(int a, int b): int { return a + b; }
+
+fn main(): int {
+    // one() is called. Result stored in vA.
+    // one() is called AGAIN. Result stored in vB.
+    // CRITICAL: vA must sit around waiting for the second one() to finish.
+    int z = add(one(), one()); 
+    return z;
+}
