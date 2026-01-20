@@ -1,0 +1,11 @@
+fn main(): int {
+    int x = 2;
+    int y = 2;
+    if (x >= y) {
+        if (y <= x) {
+            return 3;
+        }
+        return 2;
+    }
+    return 1;
+}
