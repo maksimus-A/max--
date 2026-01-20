@@ -1,25 +1,28 @@
-int N = 1000000;
-int count = 0;
+fn main(): int {
+    int N = 1000000;
+    int count = 0;
 
-int n = 2;
-while (n < (N+1)) {
-    int isPrime = 1;
+    int n = 2;
+    while (n < (N+1)) {
+        int isPrime = 1;
 
-    int d = 2;
-    while (d * d < (n+1)) {
-        // check if n % d == 0 using division trick:
-        int q = n / d;
-        if (q * d == n) {
-            isPrime = 0;
+        int d = 2;
+        while (d * d < (n+1)) {
+            // check if n % d == 0 using division trick:
+            int q = n / d;
+            if (q * d == n) {
+                isPrime = 0;
+            }
+            d = d + 1;
         }
-        d = d + 1;
-    }
 
-    if (isPrime == 1) {
-        count = count + 1;
-    }
+        if (isPrime == 1) {
+            count = count + 1;
+        }
 
-    n = n + 1;
+        n = n + 1;
+    }
+    print(count);
+    return 0;
 }
-
-return count;
+//CHECK_FILE:countPrimes.out

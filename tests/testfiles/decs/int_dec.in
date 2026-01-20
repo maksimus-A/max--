@@ -1,6 +1,10 @@
-int i = 1;
-int j = 2;
-int k = i;
-int l = j;
+fn main(): int {
+    int i = 1;
+    int j = 2;
+    int k = i;
+    int l = j;
 
-exit(i);
+    print(i + j + k + l);
+    return 0;
+}
+//CHECK_FILE:int_dec.out

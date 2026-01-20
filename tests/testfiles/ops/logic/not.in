@@ -2,7 +2,8 @@ fn main(): int {
     int x = unaryMess1();
     int y = unaryMess2();
 
-    return x + y; // returns -6 + 1 = -5 = 251 (correct!)
+    print(x + y);
+    return 0; // returns -6 + 1 = -5 = 251 (correct!)
 }
 
 
@@ -15,6 +16,7 @@ fn unaryMess1(): int {
 
     return a + b + c + d + e; // -6 % 256 = 250
 }
+//CHECK_FILE:not.out
 
 fn unaryMess2(): int {
     int x = 2;

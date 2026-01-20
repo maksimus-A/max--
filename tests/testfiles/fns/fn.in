@@ -3,9 +3,11 @@ fn main(): int {
     int y = 2;
     int z = add(x, y);
 
-    return z; // 3
+    print(z);
+    return 0; // 3
 }
 
 fn add(int x, int y): int {
     return x + y;
 }
+//CHECK_FILE:fn.out

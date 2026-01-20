@@ -1,7 +1,11 @@
-int x = 0;
-int i = 0;
-while (i < 5) {
-    x = x + 2;
-    i = i + 1;
+fn main(): int {
+    int x = 0;
+    int i = 0;
+    while (i < 5) {
+        x = x + 2;
+        i = i + 1;
+    }
+    print(x);
+    return 0; // expected 10
 }
-return x; // expected 10
+//CHECK_FILE:while.out

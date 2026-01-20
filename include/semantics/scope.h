@@ -3,10 +3,22 @@
 #include "errors/diagnostics.h"
 #include "semantics/semantics.h"
 
+// Used during scope resolution to resolve builtin func names.
+typedef enum BuiltInFnId {
+    FN_PRINT,
+    FN_ERROR,
+    FN_TOTAL_COUNT,
+} BuiltInFnId;
+
+extern const char* builtin_fn_string[FN_TOTAL_COUNT];
+extern const int builtin_fn_len[FN_TOTAL_COUNT];
+
+
 typedef enum SymbolKind {
     SYM_VAR,
     SYM_FN,
-    SYM_PARAM
+    SYM_PARAM,
+    SYM_BUILTIN_FN,
 }SymbolKind;
 
 // Function signature
@@ -33,6 +45,7 @@ typedef struct Symbol {
     union {
         BuiltInType type;
         FnInfo fn_info;
+        BuiltInFnId builtin_fn;
     };
 } Symbol;
 
@@ -55,8 +68,7 @@ void run_resolver(ASTNode* ast_root, Resolver* resolver);
 void resolver_init(Resolver* resolver, Arena* arena, Diagnostics* diags, Source* source_file, bool debug);
 
 void dump_scope_stack(Resolver* res);
-
-
+bool is_builtin_fn(SrcSpan span, Resolver* resolver);
 /*
   void (*enter_block)(void* user, ASTNode* block);
   void (*leave_block)(void* user, ASTNode* block);

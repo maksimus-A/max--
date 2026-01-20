@@ -1,4 +1,5 @@
-// finds, for all starting numbers 1..N, which produces the longest Collatz chain length.
+fn main(): int {
+    // finds, for all starting numbers 1..N, which produces the longest Collatz chain length.
 int N = 1000;
 int bestStart = 1;
 int bestLen = 1;
@@ -28,4 +29,8 @@ while (s < (N+1)) {
 }
 
 // return something you can check:
-return bestStart; // also try returning bestLen
+print(bestStart);
+print(bestLen);
+return 0; // also try returning bestLen
+}
+//CHECK_FILE:collatz.out

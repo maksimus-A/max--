@@ -5,5 +5,7 @@ fn main(): int {
 
     int i = x < 1 or not y; // 0 or (not 0) == 0 or 1 == 1
 
-    return not not i; // not not 1 == 1
+    print(not not i);
+    return 0; // not not 1 == 1
 }
+//CHECK_FILE:and_or.out

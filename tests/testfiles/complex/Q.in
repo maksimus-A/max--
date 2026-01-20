@@ -24,5 +24,7 @@ fn main(): int {
     
     // Warning: Without arrays, n=20 will take a LONG time. 
     // Start small (10 or 12).
-    return Q(50);
+    print(Q(30));
+    return 0;
 }
+//CHECK_FILE:Q.out

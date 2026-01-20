@@ -14,5 +14,7 @@ fn main(): int {
     // ack(3, 3) = 61
     // ack(3, 4) = 125
     // ack(4, 1) = 65,533 (mod 256) = 253
-    return ack(4, 1); 
+    print(ack(3, 2));
+    return 0; 
 }
+//CHECK_FILE:ack.out

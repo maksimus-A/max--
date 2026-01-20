@@ -45,15 +45,8 @@ fn main(): int {
 
     // LCM of 1..10 is 2520
     // LCM of 1..12 is 27720
-    int z = while_test();
-    //return running_lcm; 
-    return z;
-}
+    print(running_lcm);
 
-fn while_test(): int {
-    int i = 0;
-    while (i < 5) {
-        i = i + 1;
-        if (i == 4) {return i;}
-    }
+    return 0;
 }
+//CHECK_FILE:lcm.out

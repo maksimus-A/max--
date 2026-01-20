@@ -271,6 +271,10 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                             push_token(tokens, token);
                             i++;
                         }
+                        else {
+                            Token token = set_token(LESS_THAN, i, line, col, 1);
+                            push_token(tokens, token);
+                        }
                     }
                     else {
                         Token token = set_token(LESS_THAN, i, line, col, 1);
@@ -280,12 +284,10 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                 break;
             case '>':
                 {
-                    if (i < source_file->length-1) {
-                        if (source_file->buffer[i+1] == '=') {
-                            Token token = set_token(GT_EQ, i, line, col, 2);
-                            push_token(tokens, token);
-                            i++;
-                        }
+                    if (i < source_file->length-1 && source_file->buffer[i+1] == '=') {
+                        Token token = set_token(GT_EQ, i, line, col, 2);
+                        push_token(tokens, token);
+                        i++;
                     }
                     else {
                         Token token = set_token(GREATER_THAN, i, line, col, 1);

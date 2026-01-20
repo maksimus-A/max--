@@ -1,10 +1,14 @@
-int x = 1;
-int y = 2;
+fn main(): int {
+    int x = 1;
+    int y = 2;
 
-x = y;
-y = 3;
-{
-    int x = 3;
-    x = 5;
+    x = y;
+    y = 3;
+    {
+        int x = 3;
+        x = 5;
+    }
+    print(x);
+    return 0;
 }
-exit(x);
+//CHECK_FILE:int_assn.out

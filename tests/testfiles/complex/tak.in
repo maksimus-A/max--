@@ -19,5 +19,7 @@ fn main(): int {
     // tak(18, 12, 6) should return 7.
     // This looks simple, but it will execute thousands of calls 
     // and push registers to the stack heavily.
-    return tak(18, 12, 6);
+    print(tak(18, 12, 6));
+    return 0;
 }
+//CHECK_FILE:tak.out

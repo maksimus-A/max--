@@ -7,5 +7,7 @@ fn main(): int {
     // one() is called AGAIN. Result stored in vB.
     // CRITICAL: vA must sit around waiting for the second one() to finish.
     int z = add(one(), one()); 
-    return z; // 2
+    print(z);
+    return 0; // 2
 }
+//CHECK_FILE:nested_fn.out

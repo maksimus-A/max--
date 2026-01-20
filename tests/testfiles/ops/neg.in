@@ -2,5 +2,7 @@ fn main(): int {
     int x = -1;
     int y = x + 3 - (-3);
 
-    return y;
+    print(y);
+    return 0;
 }
+//CHECK_FILE:neg.out

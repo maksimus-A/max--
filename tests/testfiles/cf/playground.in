@@ -1,25 +1,28 @@
-int x = 2;
-int y = 7;
-int w = 1;
+fn main(): int {
+    int x = 2;
+    int y = 7;
+    int w = 1;
 
-if (y > x) {                // true
-    y = y - 3;              // y = 4
+    if (y > x) {                // true
+        y = y - 3;              // y = 4
 
-    if (y < 5) {            // true
-        x = x + 10;         // x = 12
+        if (y < 5) {            // true
+            x = x + 10;         // x = 12
 
-        if (x != 12) {      // false
-            w = w + 1000;
+            if (x != 12) {      // false
+                w = w + 1000;
+            } else {
+                w = w + 5;      // w = 6
+            }
+
         } else {
-            w = w + 5;      // w = 6
+            x = x - 10;
         }
 
     } else {
-        x = x - 10;
+        y = y + 50;
     }
-
-} else {
-    y = y + 50;
+    print(x + y + w);
+    return 0;        // expected: 12 + 4 + 6 = 22
 }
-
-return x + y + w;           // expected: 12 + 4 + 6 = 22
+//CHECK_FILE:playground.out

@@ -6,5 +6,7 @@ fn sumUpToN(int n): int {
 }
 
 fn main(): int {
-    return sumUpToN(20);
+    print(sumUpToN(20));
+    return 0;
 }
+//CHECK_FILE:recurse_fn.out

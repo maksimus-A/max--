@@ -24,11 +24,14 @@ fn main(): int {
 
     if (result > 50) {
         {
-            return result;
+            print(result);
+            return 0;
         }
     } else {
         {
+            print(0);
             return 0;
         }
     }
 }
+//CHECK_FILE:sum_squares.out

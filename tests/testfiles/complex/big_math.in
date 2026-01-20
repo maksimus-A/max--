@@ -45,5 +45,7 @@ fn main(): int {
     // a=2, b=3... t=21
     // a becomes 5, c becomes 9, etc...
     // The sum should be calculated correctly despite intense spilling.
-    return big_math(1); // ans: 230
+    print(big_math(1)); // ans: 230
+    return 0;
 }
+//CHECK_FILE:big_math.out

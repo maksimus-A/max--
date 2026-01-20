@@ -62,6 +62,7 @@ fn main(): int {
     //int z = add(x, y) + add(inc(inc(x)), one()) * 2;
     int z = add(add(x, y), y);
 
-    return z;
+    print(z);
+    return 0;
 }
-
+//CHECK_FILE:pg.out

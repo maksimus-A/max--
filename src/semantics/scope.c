@@ -15,7 +15,13 @@
 #include "table/ptrtable.h"
 #include "vector/vec.h"
 
-// todo: modify to accommodate 'int x;'(solved?)
+const char* builtin_fn_string[FN_TOTAL_COUNT] = {
+    [FN_PRINT] = "print"
+};
+
+const int builtin_fn_len[FN_TOTAL_COUNT] = {
+    [FN_PRINT] = 5
+};
 
 void print_fn_symbol_table(Resolver* res, FILE* out);
 
@@ -45,6 +51,50 @@ bool symbol_in_scope(Scope* scope, SrcSpan span, Resolver* resolver) {
     }
     return false;
 }
+
+// Creates a builtin function symbol from existing tables.
+Symbol* create_builtin_fn_sym(SrcSpan span, Resolver* resolver) {
+
+    BuiltInFnId builtin_id = FN_ERROR;
+
+    const char* start = &resolver->source_file->buffer[span.start];
+    for (int i = 0; i < FN_TOTAL_COUNT; i++) {
+        int builtin_fn_size = builtin_fn_len[i];
+        if (builtin_fn_size != span.length) continue;
+
+        const char* builtin_fn = builtin_fn_string[i];
+        if (memcmp(start, builtin_fn, builtin_fn_size) == 0) {
+            builtin_id = i;
+        }
+    }
+
+    Symbol* sym = (Symbol*)arena_alloc(resolver->arena, sizeof(Symbol), alignof(Symbol));
+
+    sym->symbol_span = span;
+    sym->kind = SYM_BUILTIN_FN;
+    sym->id = resolver->curr_id++;
+    sym->builtin_fn = builtin_id;
+
+    return sym;
+}
+
+// True if the given span is a builtin function's name (print).
+bool is_builtin_fn(SrcSpan span, Resolver* resolver) {
+    const char* start = &resolver->source_file->buffer[span.start];
+
+    for (int i = 0; i < FN_TOTAL_COUNT; i++) {
+        int builtin_fn_size = builtin_fn_len[i];
+        if (builtin_fn_size != span.length) continue;
+
+        const char* builtin_fn = builtin_fn_string[i];
+        if (memcmp(start, builtin_fn, builtin_fn_size) == 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 
 // Returns symbol (if it exists inside scope)
 static Symbol* get_symbol(Scope* scope, SrcSpan span, Resolver* resolver) {
@@ -292,22 +342,32 @@ WalkChildren resolver_pre(void* user, ASTNode* node) {
                 scope = scope->parent;
             }
 
-            if (name_symbol == NULL) {
-                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
-                    "Symbol '%.*s' has not been declared.", resolver->source_file);
-                break;
+            // Check if fn symbol is a builtin function.
+            bool is_builtin = is_builtin_fn(wanted, resolver);
+            if (is_builtin) {
+                // Create symbol and add to name_res table in semantics.
+                name_symbol = create_builtin_fn_sym(wanted, resolver);
+                add_symbol_to_table(resolver->semantics, name_symbol);
             }
-            if (name_symbol->kind != SYM_FN){
-                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
-                    "Symbol '%.*s' is not an assignable as a function.", resolver->source_file);
-                break;
+            else {
+                if (name_symbol == NULL) {
+                    create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
+                        "Symbol (Function) '%.*s' has not been declared.", resolver->source_file);
+                    break;
+                }
+                if (name_symbol->kind != SYM_FN){
+                    create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
+                        "Symbol '%.*s' is not an assignable as a function.", resolver->source_file);
+                    break;
+                }
+                // Check proper calling of function w/ proper arg count
+                if (node->node_info.fn_call.args.count != name_symbol->fn_info.sig.param_count) {
+                    create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
+                        "Symbol '%.*s' has too many/few parameters during its call.", resolver->source_file);
+                    break;
+                }
             }
-            // Check proper calling of function w/ proper arg count
-            if (node->node_info.fn_call.args.count != name_symbol->fn_info.sig.param_count) {
-                create_and_add_diag_fmt(resolver->diags, ERROR, node->node_info.fn_call.callee->node_info.var_name.name_span,
-                    "Symbol '%.*s' has too many/few parameters during its call.", resolver->source_file);
-                break;
-            }
+
             // Add symbol to CallExpr (we verified it exists)
             node->node_info.fn_call.callee_sym = name_symbol;
 
@@ -445,6 +505,13 @@ void print_fn_symbol_table(Resolver* res, FILE* out) {
                 fprintf(out, " %s", built_in_type_string[fnsig.param_types[j]]);
             }
             if (fnsig.param_count == 0) fprintf(out, " N/A");
+            fprintf(out, "\n");
+        }
+        else if (sym->kind == SYM_BUILTIN_FN) {
+            fprintf(out, "Symbol ID: %zu ", sym->id);
+            fprintf(out, "Builtin Function name: ");
+            print_symbol(sym->symbol_span, res->source_file);
+            fprintf(out, "Builtin ID: %d", sym->builtin_fn);
             fprintf(out, "\n");
         }
         else if (sym->kind == SYM_VAR) {

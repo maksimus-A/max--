@@ -1,0 +1,34 @@
+{
+  "testDir": "testfiles",
+  "testedExecutablePaths": {
+    "Maksimus": "../bin/maxc"
+  },
+  "runtimes": {
+    "<team-name>": "<path-to-runtime>"
+  }, 
+  "toolchains": {
+    "gazprea-llc": [
+      {
+        "stepName": "max--",
+        "executablePath": "$EXE",
+        "arguments": ["$INPUT", "-d", "$OUTPUT"],
+        "output": "mxout_new.s",
+        "allowError": true 
+      }, 
+      {
+        "stepName": "clang",
+        "executablePath": "/usr/bin/clang",
+        "arguments": ["$INPUT", "-o", "$OUTPUT"],
+        "output": "mxout"
+      },
+      {
+        "stepName": "run",
+        "executablePath": "$INPUT",
+        "arguments": [],
+        "usesInStr": true,
+        "usesRuntime": false,
+        "allowError": true
+      }
+    ] 
+  }
+}

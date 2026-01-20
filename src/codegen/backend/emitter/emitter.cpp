@@ -43,6 +43,8 @@ public:
             emit_epilogue(f);
         }
 
+        emit_runtime_library(armout);
+
         if (debug) dout << "ARM Emitted successfully!\n";
     }
 
@@ -119,8 +121,16 @@ public:
                 emit_line("\tmov x", arg_put.dst, ", ", reg(arg_put.src));
             },
             [&](const LIRCall& call) {
-                emit_line("\tbl ", function_label(call.fn_sym_id));
-                emit_line("\tmov ", reg(call.dst), ", ", RET);
+                std::string fn_label = function_label(call.fn_sym_id);
+                // TODO: Fix cheap hack. This really doesn't let me expand upon
+                // different prints nor other builtin functions.
+                if (fn_label == "_print") {
+                    emit_line("\tbl _maxc_print_int");
+                }
+                else {
+                    emit_line("\tbl ", function_label(call.fn_sym_id));
+                    emit_line("\tmov ", reg(call.dst), ", ", RET);
+                }
             },
             // [&](const auto&) {/* TODO: Implement rest of ops!*/}
         }, i.pl);
@@ -246,6 +256,50 @@ public:
         emit_line("\t.text");
         emit_line("\t.p2align 2");
         emit_line("\t.global _main");
+    }
+
+    void emit_runtime_library(std::ostream& out) {
+        // TODO: Fix. cheap way to print right now.
+        out << "\n// --- Runtime Library ---\n";
+        
+        // 1. Data Section (Format Strings)
+        out << ".section __TEXT,__cstring\n"; // macOS specific. Linux is .section .rodata
+        out << "L_fmt_int: .asciz \"%lld\\n\"\n"; // %lld for 64-bit int
+
+        // 2. Code Section
+        out << ".text\n";
+        out << ".p2align 2\n";
+        
+        // ---------------------------------------------------------
+        // Function: _maxc_print_int
+        // Input: x0 (integer to print)
+        // ---------------------------------------------------------
+        out << ".global _maxc_print_int\n";
+        out << "_maxc_print_int:\n";
+        
+        // Standard Prologue
+        out << "\tstp x29, x30, [sp, #-16]!\n";
+        out << "\tmov x29, sp\n";
+        
+        // Logic: Call printf
+        // printf("%lld\n", val)
+        // x0 = format string
+        // x1 = val
+        
+        out << "\tsub sp, sp, #16\n";// space for varargs + keep SP 16B aligned
+        out << "\tstr x0, [sp]\n"; // 1st vararg goes on stack as 8 bytes (long long)
+        // Load address of format string into x0
+        out << "\tadrp x0, L_fmt_int@PAGE\n";
+        out << "\tadd x0, x0, L_fmt_int@PAGEOFF\n";
+        
+        // Call C printf
+        out << "\tbl _printf\n";
+
+        out << "\tadd sp, sp, #16\n";
+        
+        // Standard Epilogue
+        out << "\tldp x29, x30, [sp], #16\n";
+        out << "\tret\n";
     }
 
     

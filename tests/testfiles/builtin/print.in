@@ -1,0 +1,27 @@
+fn main(): int {
+    int x = 1;
+    printFactors(60);
+
+    return 0;
+}
+
+fn printFactors(int x) {
+    int i = 1; // start at 1 (never 0, or subtraction loop never terminates)
+
+    while (i <= x) {
+        int j = x;
+
+        // "x % i == 0" via repeated subtraction:
+        // subtract i until j <= 0, then check if exactly 0
+        while (j > 0) {
+            j = j - i;
+        }
+
+        if (j == 0) {
+            print(i);
+        }
+
+        i = i + 1;
+    }
+} 
+//CHECK_FILE:print.out
