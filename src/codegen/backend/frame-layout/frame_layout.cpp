@@ -60,6 +60,9 @@ void define_frame_layout_of_slots() {
             for (size_t i = 0; i < slots_used; i++) {
                 // I have made per-function slot id's, stored in the function.
                 // The maximum slot id == next_slot_id.
+                
+                // This has two separate hacks here: one from regalloc,
+                // and one from 'anonymous slot gen' from MIR. This should solve both?
                 const Symbol* sym = ctx.slot_syms[f.id.id][i];
                 // HACK TO FIX LATER!
                 SizeAlign slot_sa;

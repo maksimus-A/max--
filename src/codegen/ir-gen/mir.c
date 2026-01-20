@@ -672,7 +672,6 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
             }
 
             return SKIP_CHILDREN;
-            break;
         }
         case AST_WHILE:
         {
@@ -715,6 +714,72 @@ WalkChildren mir_gen_pre(void* user, ASTNode* node) {
 
             return SKIP_CHILDREN;
             break;
+        }
+        case AST_LOG_OP:
+        {
+            // this is crazy. i have to create a 'fake' slot here because
+            // The result of the branch needs to know whether the 'and/or' was 1 or 0. like wow.
+
+            IRFunction* f = get_curr_func(builder);
+
+            // 1. Create an anonymous slot. 
+            // This is valid! It's just 8 bytes of scratch memory on the stack 
+            // used solely for this specific calculation.
+            SlotId result_slot = get_next_slot(f);
+            
+            // 2. Compute LHS
+            IRValue lhs = lower_expr(builder, node->node_info.bin_op.LHS);
+
+            BlockId rhs_block_id = block_init(builder);
+            BlockId join_block_id = block_init(builder);
+
+            if (node->node_info.bin_op.op.token_kind == AND) {
+
+                // If we short-circuit (LHS is 0), this value remains in the slot.
+                IRValue false_val = {.value_kind = IRVAL_IMM, .value_id.imm = 0};
+                emit_store(builder, node, result_slot, false_val);
+
+                emit_branch_if_zero(builder, node, lhs, rhs_block_id, join_block_id);
+            }
+            else if (node->node_info.bin_op.op.token_kind == OR) {
+
+                IRValue true_val = {.value_kind = IRVAL_IMM, .value_id.imm = 1};
+                emit_store(builder, node, result_slot, true_val);
+
+                emit_branch_if_zero(builder, node, lhs, join_block_id, rhs_block_id);
+            }
+            
+            // --- RHS Block ---
+            // Execution only reaches here if short-circuiting did NOT happen.
+            builder->curr_block_index = rhs_block_id.id;
+            
+            // Evaluate RHS
+            IRValue rhs = lower_expr(builder, node->node_info.bin_op.RHS);
+            
+            // rhs already computed
+            TempId rhs_bool = create_temp_id(builder);
+            emit_cmpop(builder, CMP_NEQ, node, rhs_bool, rhs, (IRValue){IRVAL_IMM, .value_id.imm=0});
+            emit_store(builder, node, result_slot, (IRValue){IRVAL_TEMP, .value_id.temp_id = rhs_bool});
+
+            // Jump to Join
+            if (get_curr_block(builder, f)->term.type == IR_UNDEFINED) {
+                emit_jump(builder, node, join_block_id);
+            }
+
+            builder->curr_block_index = join_block_id.id;
+
+            // Load the result
+            TempId result_temp = create_temp_id(builder);
+            emit_load(builder, node, result_temp, result_slot);
+
+            // Push the result temp to the stack for the parent expression.
+            IRValue final_val = {
+                .value_kind = IRVAL_TEMP,
+                .value_id.temp_id = result_temp
+            };
+            VEC_PUSH_T(&builder->val_stack, final_val);
+            
+            return SKIP_CHILDREN;
         }
         default: break;
     }
@@ -1103,16 +1168,21 @@ void print_cmp(CmpKind kind, FILE* output) {
     fprintf(output, "%s", cmp_name);
 }
 
-// TODO: Refactor to use sym_slot instead.
 void print_slot_with_id(IRBuilder* builder, IRFunction* f, SlotId slot, FILE* output) {
 
     Symbol* var_symbol = get_ptr_tbl(&f->slot_sym, slot.id);
-    assert(var_symbol != NULL);
-    SrcSpan name_span = var_symbol->symbol_span;
-    char* name_ptr = start_of_name(name_span, builder->source_file);
-    fprintf(output, "slot(");
-    print_file_slice(name_ptr, name_span.length, output);
-    fprintf(output, ":%zu)", slot.id);
+    if (var_symbol != NULL) {
+        SrcSpan name_span = var_symbol->symbol_span;
+        char* name_ptr = start_of_name(name_span, builder->source_file);
+        fprintf(output, "slot(");
+        print_file_slice(name_ptr, name_span.length, output);
+        fprintf(output, ":%zu)", slot.id);
+    }
+    else {
+        // Scratch slot we generated from MIR. Doesn't exist to the user, has no symbol info.
+        fprintf(output, "slot({generated}:%zu)", slot.id);
+    }
+
 }
 
 void print_function_name(IRBuilder* builder, size_t fn_sym_id, FILE* output) {

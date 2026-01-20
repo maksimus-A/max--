@@ -129,8 +129,12 @@ static bool is_infix(Token token) {
         case MINUS:
         case LESS_THAN:
         case GREATER_THAN:
+        case LT_EQ:
+        case GT_EQ:
         case EQQ:
         case NEQ:
+        case AND:
+        case OR:
             return true;
         default:
             return false;
@@ -157,6 +161,10 @@ static int precedence(Token token) {
         case EQQ:
         case NEQ:
             return 17;
+        case AND:
+            return 16;
+        case OR:
+            return 15;
         default:
         {
             fprintf(stdout, "No prescedence associated with this token.");
@@ -327,8 +335,19 @@ bool binop_is_cmp(Token op) {
         case NEQ:
         case LESS_THAN:
         case GREATER_THAN:
+        case LT_EQ:
+        case GT_EQ:
             return true;
         default: return false;
+    }
+}
+
+bool binop_is_logical(Token op) {
+    switch (op.token_kind) {
+        case AND:
+        case OR:
+            return true;
+        default :return false;
     }
 }
 
@@ -489,6 +508,7 @@ ASTNode* parse_expr(Parser* parser, Source* source_file, int min_prec) {
 
         ASTKind binop_kind;
         if (binop_is_cmp(op)) binop_kind = AST_CMP_OP;
+        else if (binop_is_logical(op)) binop_kind = AST_LOG_OP;
         else binop_kind = AST_BIN_OP;
 
         // Create binary expression node

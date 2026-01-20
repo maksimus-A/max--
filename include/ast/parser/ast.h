@@ -17,6 +17,7 @@ typedef enum ASTKind {
     AST_EXIT,
     AST_BIN_OP, // binary operators
     AST_CMP_OP,
+    AST_LOG_OP,
     AST_UNARY_OP,
     // Control flow stuff
     AST_COND,

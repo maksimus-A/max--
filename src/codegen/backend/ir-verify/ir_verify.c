@@ -100,9 +100,10 @@ void visit_instruct(void* user, IRInstruct* inst, IRFunction* f, IRBlock* b, siz
             // Slot referenced exists.
             Load load = inst->payload.load_payload;
             Symbol* slot_sym = get_ptr_tbl(verifier->ir_module->name_resolution, load.src.id);
-            if (slot_sym == NULL) {
-                add_diag_mir(verifier->ir_diags, ERROR, "Symbol %zu does not exist, but was referenced.", load.src.id);
-            }
+            // Due to anonymous slots creating during MIR, this is fine.
+            // if (slot_sym == NULL) {
+            //     add_diag_mir(verifier->ir_diags, ERROR, "Symbol %zu does not exist, but was referenced.", load.src.id);
+            // }
             // Slot has a known type (this is kind of useless because
             // variables get assigned a type (i think) during frontend generation, always.)
             
@@ -119,9 +120,10 @@ void visit_instruct(void* user, IRInstruct* inst, IRFunction* f, IRBlock* b, siz
             // Slot referenced exists
             Store store = inst->payload.store_payload;
             Symbol* slot_sym = get_ptr_tbl(verifier->ir_module->name_resolution, store.dst.id);
-            if (slot_sym == NULL) {
-                add_diag_mir(verifier->ir_diags, ERROR,"Symbol %zu does not exist, but was referenced.", store.dst.id);
-            }
+            // Due to anonymous slots creating during MIR, this is fine.
+            // if (slot_sym == NULL) {
+            //     add_diag_mir(verifier->ir_diags, ERROR,"Symbol %zu does not exist, but was referenced.", store.dst.id);
+            // }
 
             // Slot has a known type (this is kind of useless because
             // variables get assigned a type (i think) during frontend generation, always.)

@@ -1,0 +1,161 @@
+// Basic truthiness helpers (implicit via ints)
+// 0 = false, non-zero = true
+
+fn sideTrue(): int {
+    return 1;
+}
+
+fn sideFalse(): int {
+    return 0;
+}
+
+fn sideOne(): int {
+    return 1;
+}
+
+fn sideZero(): int {
+    return 0;
+}
+
+// This function is used to detect whether RHS was evaluated.
+// If short-circuit works, this should NOT run in many cases.
+fn expensive(): int {
+    return 42;
+}
+
+// ---------- TEST 1: simple short-circuit ----------
+fn test1(): int {
+    int x = 0;
+    int y = expensive(); // should NOT be evaluated
+
+    // false and RHS -> short-circuit, RHS must not run
+    int r = x and y;
+
+    return r; // expected: 0
+}
+
+// ---------- TEST 2: OR short-circuit ----------
+fn test2(): int {
+    int x = 1;
+    int y = expensive(); // should NOT be evaluated
+
+    // true or RHS -> short-circuit
+    int r = x or y;
+
+    return r; // expected: 1
+}
+
+// ---------- TEST 3: nested and/or with not ----------
+fn test3(): int {
+    int a = 1;
+    int b = 0;
+    int c = 1;
+
+    // Breakdown:
+    // not b        -> 1
+    // a and not b  -> 1
+    // c and 0      -> 0
+    // 1 or 0       -> 1
+    int r = a and not b or c and 0;
+
+    return r; // expected: 1
+}
+
+// ---------- TEST 4: precedence torture ----------
+fn test4(): int {
+    int x = 0;
+    int y = 1;
+    int z = 0;
+
+    // precedence: not > and > or
+    //
+    // not x -> 1
+    // 1 and y -> 1
+    // z -> 0
+    // 1 or 0 -> 1
+    int r = not x and y or z;
+
+    return r; // expected: 1
+}
+
+// ---------- TEST 5: deeply nested short-circuit ----------
+fn test5(): int {
+    int a = 0;
+
+    // a is false, so everything after first AND should not run
+    int r = a and expensive() or expensive();
+
+    // a and expensive() -> 0
+    // 0 or expensive()  -> RHS evaluated -> 42 -> truthy -> 1
+    return r; // expected: 1
+}
+
+// ---------- TEST 6: chained logical expressions ----------
+fn test6(): int {
+    int r =
+        not not 0              // 0
+        or not 0               // 1
+        and 0                  // 0
+        or not (0 or 1 and 0); // not (0 or 0) = 1
+
+    // Evaluate stepwise:
+    // not not 0 -> 0
+    // 0 or not 0 -> 1
+    // 1 and 0 -> 0
+    // 1 and 0 -> 0
+    // (1 and 0) -> 0
+    // 0 or not (0 or (1 and 0))
+    // 1 and 0 -> 0
+    // 0 or 0 -> 0
+    // not 0 -> 1
+    // 0 or 1 -> 1
+
+    return r; // expected: 1
+}
+
+// ---------- TEST 7: function calls as operands ----------
+fn test7(): int {
+    // sideFalse() -> 0, so sideOne() should not be called
+    int r1 = sideFalse() and sideOne();
+
+    // sideTrue() -> 1, so sideZero() should be called
+    int r2 = sideTrue() and sideZero();
+
+    // sideTrue() -> 1, short-circuit OR
+    int r3 = sideTrue() or sideZero();
+
+    return r1 + r2 + r3;
+    // r1 = 0
+    // r2 = 0
+    // r3 = 1
+    // expected: 1
+}
+
+// ---------- TEST 8: maximal evil ----------
+fn test8(): int {
+    int x = 1;
+    int y = 0;
+
+    int r =
+        not (x and y)               // not 0 -> 1
+        and (x or y)               // 1
+        and not (y or not x)       // not (0 or 0) -> 1
+        or (y and expensive());    // y is 0, RHS should not run
+
+    // Final: 1 or 0 -> 1
+    return r; // expected: 1
+}
+
+// ---------- MAIN ----------
+fn main(): int {
+    return
+        test1()   // 0
+      + test2()   // 1
+      + test3()   // 1
+      + test4()   // 1
+      + test5()   // 1
+      + test6()   // 1
+      + test7()   // 1
+      + test8();  // 1
+    // total expected: 7
+}

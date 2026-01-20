@@ -153,6 +153,7 @@ void walk_node(Visitor* visitor, void* user, ASTNode* node) {
         }
         case AST_BIN_OP:
         case AST_CMP_OP:
+        case AST_LOG_OP:
         {
             if (walk_children == WALK_CHILDREN) {
                 ASTNode* LHS = node->node_info.bin_op.LHS;

@@ -1,7 +1,21 @@
-int xy = 1;
+// This function is used to detect whether RHS was evaluated.
+// If short-circuit works, this should NOT run in many cases.
+fn expensive(): int {
+    return 42;
+}
+
+// ---------- TEST 5: deeply nested short-circuit ----------
+fn test5(): int {
+    int a = 0;
+
+    // a is false, so everything after first AND should not run
+    int r = a and expensive() or expensive();
+
+    // a and expensive() -> 0
+    // 0 or expensive()  -> RHS evaluated -> 42 -> truthy -> 1
+    return r; // expected: 1
+}
 
 fn main(): int {
-    int a = xy + 1;
-
-    return a;
+    return test5();
 }
