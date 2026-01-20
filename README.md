@@ -74,7 +74,7 @@ fn main(): int {
 } // Prints: 6 3 3 6 6
 ```
 
-A simple example file to understand syntax.
+A simple example file to understand syntax. To see more example files and syntax, look in `tests`.
 
 Quirks:
 - If/else/while must be followed by a block, not a single statement.
