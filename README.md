@@ -31,7 +31,15 @@ the compiler won't create any compileable code unless it's an arm linux machine.
 - Run `./compile.sh`. This will build the compiler (the `bin/maxc` binary).
 
 ### Using the compiler
-- First, run the maxc binary to compile your code into a .s file. Then, you can see all your print statements and the exit code using `./assm.sh`.
+Run the maxc binary with your program
+
+`bin/maxc {file_name}.mxm [-d]`
+
+This creates an assembly file, `mxout_new.s`. Then, you can see all your print statements and the exit code using:
+
+`./assm.sh`.
+
+If you want to see the compiler in action, use the `-d` flag. It will print what's happening to your program through every single stage of the compiler.
 
 If you'd rather configure some stuff:
 ```
