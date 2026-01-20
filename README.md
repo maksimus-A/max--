@@ -39,6 +39,43 @@ cmake -S . -B build
 cmake --build build
 ```
 
+## Example max-- file
+
+```
+fn add(int x, int y): int {
+    return x + y;
+}
+
+fn main(): int {
+    int x = 1;
+    int y = 2;
+    int i = 0;
+    while (i < 5) {
+        if (i - x == 0 or i - y == 0) {
+            print(add(x, y)); // 3
+        }
+        else {
+            print(2 * (add(x, y))); // 6
+        }
+        i = i + 1;
+    }
+
+    return 0;
+} // Prints: 6 3 3 6 6
+```
+
+A simple example file to understand syntax.
+
+Quirks:
+- If/else/while must be followed by a block, not a single statement.
+- The program must contain a main() function to execute.
+- Only int types are allowed.
+- Programs with functions with more than 7 arguments/parameters may not execute at all.
+- Programs with more than 16 active variables per function may not execute at all.
+
+I intended for file extensions to be `file.mxm`, but I used a test suite named [Dragon Runner](https://github.com/cmput415/Dragon-Runner) to test my code. You can try it out too! But it requires input files to end with the `.in` extension. Canonical max-- files should be ended with `.mxm`.
+
+
 ## Basic Architecture
 
 ![Pipeline Architecture](img/max--_pipeline.png)
