@@ -51,7 +51,7 @@ cmake --build build
 
 ## Example max-- file
 
-```
+```rust
 fn add(int x, int y): int {
     return x + y;
 }
