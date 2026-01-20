@@ -3,11 +3,8 @@
   "testedExecutablePaths": {
     "Maksimus": "../bin/maxc"
   },
-  "runtimes": {
-    "<team-name>": "<path-to-runtime>"
-  }, 
   "toolchains": {
-    "gazprea-llc": [
+    "max--clang": [
       {
         "stepName": "max--",
         "executablePath": "$EXE",
