@@ -252,6 +252,8 @@ static CmpKind get_cmp_kind(ASTNode* node) {
     switch (op.token_kind) {
         case LESS_THAN: return CMP_LT;
         case GREATER_THAN: return CMP_GT;
+        case LT_EQ: return CMP_LE;
+        case GT_EQ: return CMP_GE;
         case EQQ: return CMP_EQ;
         case NEQ: return CMP_NEQ;
         default: return CMP_ERR;
@@ -1163,6 +1165,8 @@ void print_cmp(CmpKind kind, FILE* output) {
         case CMP_NEQ: cmp_name = "cmp_neq "; break;
         case CMP_GT: cmp_name = "cmp_gt "; break;
         case CMP_LT: cmp_name = "cmp_lt "; break;
+        case CMP_GE: cmp_name = "cmp_ge"; break;
+        case CMP_LE: cmp_name = "cmp_le"; break;
         case CMP_ERR: cmp_name = "NO_CMP_FOUND "; break;
     }
     fprintf(output, "%s", cmp_name);

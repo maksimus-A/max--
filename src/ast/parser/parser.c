@@ -157,6 +157,8 @@ static int precedence(Token token) {
             return 19;
         case LESS_THAN:
         case GREATER_THAN:
+        case LT_EQ:
+        case GT_EQ:
             return 18;
         case EQQ:
         case NEQ:

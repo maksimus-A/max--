@@ -95,6 +95,8 @@ typedef struct BinOp {
 typedef enum {
     CMP_LT,
     CMP_GT,
+    CMP_LE,
+    CMP_GE,
     CMP_EQ,
     CMP_NEQ,
     CMP_ERR

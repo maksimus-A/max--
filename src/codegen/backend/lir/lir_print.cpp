@@ -56,6 +56,8 @@ static void print_cmp(const CmpKind& kind, std::ostream& out) {
         case CMP_NEQ: out << "NEQ"; break;
         case CMP_GT: out << "GT"; break;
         case CMP_LT: out << "LT"; break;
+        case CMP_GE: out << "GE"; break;
+        case CMP_LE: out << "LE"; break;
         case CMP_ERR: out << "CMP_ERR"; break; 
     }
 }

@@ -265,14 +265,32 @@ Result lex_input(TokenBuffer* tokens, Source* source_file) {
                 break;
             case '<':
                 {
-                    Token token = set_token(LESS_THAN, i, line, col, 1);
-                    push_token(tokens, token);
+                    if (i < source_file->length-1) {
+                        if (source_file->buffer[i+1] == '=') {
+                            Token token = set_token(LT_EQ, i, line, col, 2);
+                            push_token(tokens, token);
+                            i++;
+                        }
+                    }
+                    else {
+                        Token token = set_token(LESS_THAN, i, line, col, 1);
+                        push_token(tokens, token);
+                    }
                 }
                 break;
             case '>':
                 {
-                    Token token = set_token(GREATER_THAN, i, line, col, 1);
-                    push_token(tokens, token);
+                    if (i < source_file->length-1) {
+                        if (source_file->buffer[i+1] == '=') {
+                            Token token = set_token(GT_EQ, i, line, col, 2);
+                            push_token(tokens, token);
+                            i++;
+                        }
+                    }
+                    else {
+                        Token token = set_token(GREATER_THAN, i, line, col, 1);
+                        push_token(tokens, token);
+                    }
                 }
                 break;
             case '\n':

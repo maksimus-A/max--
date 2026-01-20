@@ -305,6 +305,8 @@ private:
             case CMP_NEQ: return "NE";
             case CMP_GT: return "GT";
             case CMP_LT: return "LT";
+            case CMP_GE: return "GE";
+            case CMP_LE: return "LE";
             case CMP_ERR: return "CMP_ERR"; 
         }
     }
