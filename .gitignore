@@ -3,6 +3,8 @@ build/
 
 # Ignore binaries
 bin/
+# Ignore generated executable from maxc compiler
+exe/
 
 .cache/
 

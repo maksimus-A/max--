@@ -54,9 +54,16 @@ private:
 
 };
 
-extern "C" int run_backend_pipeline(Vector* funcs, IRModule* mod, Arena* a, Diagnostics* diags, Source* source_file, bool debug) {
+extern "C" int run_backend_pipeline(Vector* funcs, IRModule* mod, Arena* a, 
+        Diagnostics* diags, Source* source_file, bool debug, const char* output_asm_path) {
     try {
-        std::ofstream armout("mxout_new.s");
+        std::ofstream armout(output_asm_path);
+
+        if (!armout.is_open()) {
+             std::cerr << "Error: Could not open output file " << output_asm_path << "\n";
+             return 1;
+        }
+
         BackendContext ctx(*mod, *source_file);
         BackendDriver driver(mod, source_file, diags, debug, ctx, armout);
         driver.run(funcs);

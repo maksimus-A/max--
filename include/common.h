@@ -65,3 +65,8 @@ char* start_of_name(SrcSpan span, Source* source_file);
 void print_file_slice(char* start_ptr, size_t length, FILE* output);
 
 void ir_module_init(IRModule* mod, Vector* funcs, PtrTable* name_res);
+
+char* change_extension(const char* filename, const char* new_ext);
+char* strip_extension(const char* filename);
+void ensure_directory_exists(const char* dir_path);
+char* get_basename_no_ext(const char* path);

@@ -36,42 +36,51 @@
 //  Write output to a .m file (i guess? IDK what extension to use haha)
 // Use like clang to convert the file into actual bytecode
 
-typedef struct Args Args;
-struct Args {
-    char* input_path;
-    char* output_assm_path;
-    short error_code;
-    short debug;
+typedef struct {
+    char *input_path;
+    char *output_bin_path; // For the binary (e.g., -o flag)
+    int error_code;
+    int debug;
     bool gen_assm_file;
-};
+} Args;
 
 Args parse_args(int argc, char **argv) {
-    Args args;
-    args.input_path = NULL;
-    args.output_assm_path = NULL;
-    args.error_code = 0;
-    args.debug = 0;
-    args.gen_assm_file = false;
-
+    Args args = {0};
+    
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s file.m\n [-debug]", argv[0]);
+        fprintf(stderr, "Usage: %s file.m [-S] [-d] [-o output_name]\n", argv[0]);
         args.error_code = 1;
         return args;
     }
-    args.input_path = argv[1];
+
+    // Simple parsing loop
     for (int i = 1; i < argc; i++) {
-        if (argv[i] != NULL && argv[i][0] == '-') {
-            if (argv[i][1] == 'd') {
-                args.debug = 1;
-            }
-            /* handle other flags as needed */
-            if (argv[i][1] == 'S') { // gen assembly flag
+        if (argv[i][0] == '-') {
+            if (strcmp(argv[i], "-S") == 0) {
                 args.gen_assm_file = true;
+            } else if (strcmp(argv[i], "-d") == 0) {
+                args.debug = 1;
+            } else if (strcmp(argv[i], "-o") == 0) {
+                if (i + 1 < argc) {
+                    args.output_bin_path = argv[++i];
+                } else {
+                    fprintf(stderr, "Error: -o requires an argument\n");
+                    args.error_code = 1; 
+                    return args;
+                }
+            }
+        } else {
+            if (args.input_path == NULL) {
+                args.input_path = argv[i];
             }
         }
     }
-    // TODO: Ensure valid input path, check for output path, etc
-    args.error_code = 0;
+    
+    if (!args.input_path) {
+        fprintf(stderr, "Error: No input file provided.\n");
+        args.error_code = 1;
+    }
+    
     return args;
 }
 
@@ -228,46 +237,64 @@ int main(int argc, char **argv) {
         fprintf(stdout, "\nIR Verifier: IR Verified!\nInstructions visited: %zu\n\n", verifier.inst_visited);
     }
 
-    // Transfers all backend work to C++.
-    run_backend_pipeline(&builder.funcs, &mod, &arena, &ir_diags, &source_file, args.debug);
+    // Ensure the output folder exists
+    const char* output_dir = "exe";
+    ensure_directory_exists(output_dir);
+
+    // Determine base name (e.g., "calc" from "tests/math/calc.m")
+    char* base_name = get_basename_no_ext(args.input_path);
+    
+    // Construct the Assembly Path: "exe/calc.s"
+    // We put the .s file here too so it doesn't clutter the source folder
+    char asm_path[1024];
+    snprintf(asm_path, sizeof(asm_path), "%s/%s.s", output_dir, base_name);
+
+    // Run Backend with this specific path
+    int backend_res = run_backend_pipeline(&builder.funcs, &mod, &arena, &ir_diags, &source_file, args.debug, asm_path);
+    
+    if (backend_res != 0) {
+        free(base_name);
+        return backend_res;
+    }
+
+    // Assemble/Link (if -S was NOT passed)
+    if (!args.gen_assm_file) {
+        // Construct the Binary Path: "exe/calc" (or "exe/calc.exe" on Windows)
+        char bin_path[1024];
+        
+        // If user provided -o, use that exactly. Otherwise use our auto-generated path.
+        if (args.output_bin_path) {
+            strncpy(bin_path, args.output_bin_path, sizeof(bin_path));
+        } else {
+            snprintf(bin_path, sizeof(bin_path), "%s/%s", output_dir, base_name);
+        }
+
+        // Construct the command: clang exe/calc.s -o exe/calc
+        char cmd[2048];
+        snprintf(cmd, sizeof(cmd), "clang %s -o %s", asm_path, bin_path);
+        
+        if (args.debug) printf("[Linker Cmd]: %s\n", cmd);
+
+        int link_res = system(cmd);
+        
+        if (link_res != 0) {
+            fprintf(stderr, "Error: Linking failed.\n");
+        } else {
+            // Cleanup: Delete the .s file to keep "exe/" clean, 
+            // unless you want to keep it for debugging.
+            if (!args.debug) remove(asm_path);
+            
+            if (args.debug) printf("Successfully created: %s\n", bin_path);
+        }
+    } else {
+        printf("Assembly generated at: %s\n", asm_path);
+    }
 
     // Free all memory
     free(tokens.data);
+    free(base_name);
     free_source(&source_file);
     free_ast_arena(&parser); // todo: just free arena; confusing naming.
     
     return 0;
 }
-
-
-    /*
-    // Frame layout pass
-    FrameLayout frame_layout = {0};
-    frame_layout_init(&frame_layout, &ir_diags, &arena, &mod);
-    run_frame_layout(&frame_layout);
-
-    if (args.debug) print_frames(&frame_layout);
-
-    // Insert frames created into IRModule
-    mod.frames = frame_layout.frames;
-
-    // Lower IR generation pass
-    LIRBuilder lir_builder = {0};
-    lir_builder_init(&lir_builder, &arena, &ir_diags, &mod, &source_file);
-    run_lir_builder(&lir_builder);
-
-    if (args.debug) dump_lir(&lir_builder, stdout);
-    fprintf(stdout, "\n\n\n");
-
-    // Final pass. Generate ARM64 only (for now at least).
-    ARMEmitter emitter = {0};
-    // Debugging; should just find the name based on input name.
-    const char* name = "mx_out.s";
-    FILE* assm = create_assm_file(name);
-    if (assm == NULL) {
-        fprintf(stderr, "Failed to create assembly file.");
-        return 6;
-    }
-    arm_emitter_init(&emitter, assm, &lir_builder.lir_funcs, &mod, &ir_diags);
-    run_arm_emitter(&emitter);
-    */

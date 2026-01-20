@@ -1,6 +1,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h> // For mkdir
+#include <sys/types.h>
 #include "ast/parser/ast.h"
 #include "ast/parser/parser.h"
 #include "common.h"
@@ -81,4 +84,76 @@ void ir_module_init(IRModule* mod, Vector* funcs, PtrTable* name_res) {
     mod->funcs = funcs;
     mod->name_resolution = name_res; // found in struct Semantics
     // TODO: Add 2 other tables once they're actually used.
+}
+
+// Helper to replace extension (e.g., "test.m" -> "test.s")
+char* change_extension(const char* filename, const char* new_ext) {
+    const char* dot = strrchr(filename, '.');
+    if (!dot || dot == filename) return NULL; // No extension found
+
+    size_t base_len = dot - filename;
+    size_t ext_len = strlen(new_ext);
+    
+    char* new_filename = (char*)malloc(base_len + ext_len + 1);
+    memcpy(new_filename, filename, base_len);
+    strcpy(new_filename + base_len, new_ext);
+    
+    return new_filename;
+}
+
+// Helper to strip extension entirely (e.g., "test.m" -> "test") for the binary name
+char* strip_extension(const char* filename) {
+    const char* dot = strrchr(filename, '.');
+    if (!dot || dot == filename) return strdup(filename);
+
+    size_t base_len = dot - filename;
+    char* new_filename = (char*)malloc(base_len + 1);
+    memcpy(new_filename, filename, base_len);
+    new_filename[base_len] = '\0';
+    
+    return new_filename;
+}
+
+// Helper: Ensure the output directory exists
+void ensure_directory_exists(const char* dir_path) {
+    struct stat st = {0};
+    if (stat(dir_path, &st) == -1) {
+#ifdef _WIN32
+        _mkdir(dir_path);
+#else
+        mkdir(dir_path, 0700);
+#endif
+    }
+}
+
+// Helper: Extract filename without path or extension
+// Input: "tests/math/calc.m" -> Returns: "calc"
+char* get_basename_no_ext(const char* path) {
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\'); // Handle Windows paths
+    
+    // Pick the last separator found
+    const char *filename_start = path;
+    if (slash && backslash) {
+        filename_start = (slash > backslash) ? slash + 1 : backslash + 1;
+    } else if (slash) {
+        filename_start = slash + 1;
+    } else if (backslash) {
+        filename_start = backslash + 1;
+    }
+
+    // Now find the extension dot
+    const char *dot = strrchr(filename_start, '.');
+    
+    size_t len;
+    if (dot) {
+        len = dot - filename_start;
+    } else {
+        len = strlen(filename_start);
+    }
+
+    char *result = (char*)malloc(len + 1);
+    memcpy(result, filename_start, len);
+    result[len] = '\0';
+    return result;
 }

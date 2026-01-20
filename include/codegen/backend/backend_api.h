@@ -6,7 +6,8 @@
 extern "C" {
 #endif
 
-int run_backend_pipeline(Vector* funcs, IRModule* mod, Arena* a, Diagnostics* diags, Source* source_file, bool debug);
+int run_backend_pipeline(Vector* funcs, IRModule* mod, Arena* a, 
+        Diagnostics* diags, Source* source_file, bool debug, const char* output_asm_path);
 
 #ifdef __cplusplus
 }

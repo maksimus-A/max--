@@ -18,7 +18,7 @@ I'd love for you to try it out yourself! Unfortunately it only targets AArch64 f
 
 Even this took me a month of steady work, so it's current feature set is all that will exist for a little while.
 
-Anyone is free to do whatever they want with this project :)
+Feel free to take a look or ask me any questions about how things work! Was a great learning experience.
 
 
 ## Basic setup
@@ -33,11 +33,13 @@ the compiler won't create any compileable code unless it's an arm linux machine.
 ### Using the compiler
 Run the maxc binary with your program
 
-`bin/maxc {file_name}.mxm [-d]`
+`bin/maxc [-S] {file_name}.mxm [-d] [-o {output_name}]`
 
-This creates an assembly file, `mxout_new.s`. Then, you can see all your print statements and the exit code using:
+-S: Emit raw assembly file in `exe/{file_name}.s`
 
-`./assm.sh`.
+-o: Change output file name/directory.
+
+-d: Verbose debug information.
 
 If you want to see the compiler in action, use the `-d` flag. It will print what's happening to your program through every single stage of the compiler.
 
